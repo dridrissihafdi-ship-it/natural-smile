@@ -821,17 +821,20 @@ async function loadPatHist(id){S.patHist=null;S.patFin=null;
  try{if(S.isOwner){const f=await S.db.doc('finances/'+id).get();if(S.patient!==id)return;S.patFin=f.exists?f.data():null}}catch(e){}
  refresh('patients')}
 const MAD0=n=>new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(n||0)+' DH';
-function histHTML(){const h=S.patHist?.soins||[];if(!h.length)return '';const L=[...h].reverse();const more=L.length>12&&!S.histAll;
+function histHTML(){const h=(S.patHist?.soins||[]).map(hS);if(!h.length)return '';const L=[...h].reverse();const more=L.length>12&&!S.histAll;
  return `<section class="card"><div class="card-h"><h3>Historique des soins</h3><span class="sp"></span><span class="small muted">${h.length} acte${h.length>1?'s':''}</span></div>
- <div class="tablewrap"><table><thead><tr><th>Date</th><th>Dent</th><th>Acte</th></tr></thead><tbody>${(more?L.slice(0,12):L).map(x=>`<tr><td class="num" style="white-space:nowrap">${esc(x[0]?fmtDate(x[0],{day:'2-digit',month:'2-digit',year:'numeric'}):'')}</td><td>${esc(x[1])}</td><td>${esc(x[2])}${x[3]?`<div class="small muted">${esc(x[3])}</div>`:''}</td></tr>`).join('')}</tbody></table></div>
+ <div class="tablewrap"><table><thead><tr><th>Date</th><th>Dent</th><th>Acte</th></tr></thead><tbody>${(more?L.slice(0,12):L).map(x=>`<tr><td class="num" style="white-space:nowrap">${esc(x.d?fmtDate(x.d,{day:'2-digit',month:'2-digit',year:'numeric'}):'')}</td><td>${esc(x.dent)}</td><td>${esc(x.acte)}${x.c?`<div class="small muted">${esc(x.c)}</div>`:''}</td></tr>`).join('')}</tbody></table></div>
  ${more?`<button class="btn ghost" data-act="histAll" style="margin-top:8px">Afficher tout l'historique</button>`:''}</section>`}
-function finHTML(){if(!S.isOwner||!S.patFin)return '';const f=S.patFin;const A=f.actes||[],P=f.paiements||[];
- const th=A.reduce((t,a)=>t+(a[3]-(a[4]||0)),0),tp=P.reduce((t,x)=>t+x[1],0),r=th-tp;const MO={especes:'Espèces',carte:'Carte',cheque:'Chèque',virement:'Virement'};
+function finHTML(){if(!S.isOwner||!S.patFin)return '';const f=S.patFin;const A=(f.actes||[]).map(hA),P=(f.paiements||[]).map(hP);
+ const th=A.reduce((t,a)=>t+(a.prix-a.remise),0),tp=P.reduce((t,x)=>t+x.m,0),r=th-tp;const MO={especes:'Espèces',carte:'Carte',cheque:'Chèque',virement:'Virement'};
  return `<section class="card stack" style="gap:12px"><div class="card-h"><h3>Honoraires et paiements</h3><span class="sp"></span><span class="pill acc">${ic('lock')}Visible par vous seul</span></div>
  <div class="mini-kpis"><div class="kpi"><b>${MAD0(th)}</b><span class="small muted">honoraires</span></div><div class="kpi"><b>${MAD0(tp)}</b><span class="small muted">payé</span></div><div class="kpi"><b style="color:${r>0.5?'var(--bad)':'var(--ok)'}">${MAD0(r)}</b><span class="small muted">${r>0.5?'reste à payer':r<-0.5?'avance':'soldé'}</span></div></div>
- ${P.length?`<div><div class="small" style="font-weight:600;margin-bottom:4px">Paiements (${P.length})</div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Mode</th><th class="r">Montant</th></tr></thead><tbody>${[...P].reverse().map(x=>`<tr><td class="num">${esc(x[0]?fmtDate(x[0],{day:'2-digit',month:'2-digit',year:'numeric'}):'')}</td><td>${esc(MO[x[2]]||x[2]||'')}${x[3]?`<div class="small muted">${esc(x[3])}</div>`:''}</td><td class="r num">${MAD0(x[1])}</td></tr>`).join('')}</tbody></table></div></div>`:''}
- ${A.length?`<details><summary class="small" style="cursor:pointer;font-weight:600">Détail des honoraires (${A.length} actes)</summary><div class="tablewrap"><table><thead><tr><th>Date</th><th>Acte</th><th class="r">Prix</th></tr></thead><tbody>${[...A].reverse().map(a=>`<tr><td class="num">${esc(a[0]?fmtDate(a[0],{day:'2-digit',month:'2-digit',year:'numeric'}):'')}</td><td>${esc(a[2])}${a[1]?` <span class="small muted">(${esc(a[1])})</span>`:''}</td><td class="r num">${MAD0(a[3]-(a[4]||0))}</td></tr>`).join('')}</tbody></table></div></details>`:''}</section>`}
+ ${P.length?`<div><div class="small" style="font-weight:600;margin-bottom:4px">Paiements (${P.length})</div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Mode</th><th class="r">Montant</th></tr></thead><tbody>${[...P].reverse().map(x=>`<tr><td class="num">${esc(x.d?fmtDate(x.d,{day:'2-digit',month:'2-digit',year:'numeric'}):'')}</td><td>${esc(MO[x.mode]||x.mode||'')}${x.obs?`<div class="small muted">${esc(x.obs)}</div>`:''}</td><td class="r num">${MAD0(x.m)}</td></tr>`).join('')}</tbody></table></div></div>`:''}
+ ${A.length?`<details><summary class="small" style="cursor:pointer;font-weight:600">Détail des honoraires (${A.length} actes)</summary><div class="tablewrap"><table><thead><tr><th>Date</th><th>Acte</th><th class="r">Prix</th></tr></thead><tbody>${[...A].reverse().map(a=>`<tr><td class="num">${esc(a.d?fmtDate(a.d,{day:'2-digit',month:'2-digit',year:'numeric'}):'')}</td><td>${esc(a.acte)}${a.dent?` <span class="small muted">(${esc(a.dent)})</span>`:''}</td><td class="r num">${MAD0(a.prix-a.remise)}</td></tr>`).join('')}</tbody></table></div></details>`:''}</section>`}
 /* ---- Import de l'historique de l'ancien logiciel ---- */
+const hS=x=>Array.isArray(x)?{d:x[0]||'',dent:x[1]||'',acte:x[2]||'',c:x[3]||''}:x;
+const hA=x=>Array.isArray(x)?{d:x[0]||'',dent:x[1]||'',acte:x[2]||'',prix:+x[3]||0,remise:+x[4]||0}:x;
+const hP=x=>Array.isArray(x)?{d:x[0]||'',m:+x[1]||0,mode:x[2]||'',obs:x[3]||''}:x;
 async function readImportFile(f){let buf=await f.arrayBuffer();const u=new Uint8Array(buf);
  if(u[0]===0x1f&&u[1]===0x8b){if(!window.DecompressionStream)throw new Error('gz');const st=new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));buf=await new Response(st).arrayBuffer()}
  return JSON.parse(new TextDecoder('utf-8').decode(buf))}
@@ -843,7 +846,7 @@ $('#histfile').addEventListener('change',async e=>{const f=e.target.files[0];e.t
   <div class="list"><div class="li"><div class="grow t">Patients</div><b class="num">${data.patients.length}</b></div><div class="li"><div class="grow t">Rendez-vous</div><b class="num">${data.rdv.length}</b></div><div class="li"><div class="grow t">Actes de soins</div><b class="num">${nS}</b></div><div class="li"><div class="grow t">Paiements</div><b class="num">${nP}</b></div></div>
   <div class="small muted">Les patients déjà présents (même nom, téléphone ou date de naissance compatibles) sont complétés au lieu d'être dupliqués. Les honoraires et paiements ne sont visibles que par vous. L'import prend quelques minutes : gardez cette page ouverte. Vous pouvez le relancer sans créer de doublons.</div>
   <div id="histProg" class="stack" style="gap:6px" hidden><div class="progress"><i id="histBar" style="width:0%"></i></div><div class="small muted" id="histTxt"></div></div>`,
-  onOk:async()=>{const b=$('#dlgok');b.disabled=true;$('#dlg [data-close]')?.setAttribute('disabled','');try{await runHistImport(data)}catch(err){console.warn(err);toast(errMsg(err),'err');b.disabled=false;return false}return true}})});
+  onOk:async()=>{const b=$('#dlgok');b.disabled=true;$('#dlg [data-close]')?.setAttribute('disabled','');try{await runHistImport(data)}catch(err){console.warn(err);toast(errMsg(err),'err');const t=$('#histTxt');if(t)t.textContent='Erreur : '+(err.code||'')+' '+(err.message||'').slice(0,140)+'. Relancez l\'import.';b.disabled=false;return false}return true}})});
 async function runHistImport(D){const prog=$('#histProg');prog.hidden=false;const setP=(x,t)=>{$('#histBar').style.width=Math.round(x*100)+'%';$('#histTxt').textContent=t};
  setP(0.01,'Lecture des patients existants…');
  const ex=await S.db.collection('patients').get();const byId=new Set(),byAid=new Map(),byKey=new Map();
@@ -858,13 +861,15 @@ async function runHistImport(D){const prog=$('#histProg');prog.hidden=false;cons
  const pn={};D.patients.forEach(p=>pn[String(p.aid)]=[p.nom,p.prenom].filter(Boolean).join(' '));const pt={};D.patients.forEach(p=>pt[String(p.aid)]=p.tel||'');
  setP(0.03,'Vérification des rendez-vous à venir…');
  const fut=await S.db.collection('rdv').where('date','>=',today()).get();const futKey=new Set(fut.docs.filter(d=>!d.id.startsWith('old_')).map(d=>{const x=d.data();return x.patientId+'|'+x.date+'|'+x.heure}));
- let skipped=0;
- for(const r of D.rdv){const [eid,aid,date,heure,duree,acte,statut]=r;const pid=idOf[String(aid)];if(!pid){skipped++;continue}
+ let skipped=0;const lastR=D.rdv[D.rdv.length-1];let rdvDone=false;
+ try{if(lastR){const x=await S.db.doc('rdv/old_ev_'+lastR[0]).get();rdvDone=x.exists}}catch(e){}
+ if(rdvDone){setP(0.05,'Patients et rendez-vous déjà importés : reprise avec les soins et paiements…');for(let i=writes.length-1;i>=0;i--)if(writes[i][0].startsWith('patients/'))writes.splice(i,1)}
+ if(!rdvDone)for(const r of D.rdv){const [eid,aid,date,heure,duree,acte,statut]=r;const pid=idOf[String(aid)];if(!pid){skipped++;continue}
   if(futKey.has(pid+'|'+date+'|'+heure)){skipped++;continue}
   writes.push(['rdv/old_ev_'+eid,{patient:pn[String(aid)]||'Patient',patientId:pid,date,heure,duree,acte:acte||'',praticien:'',tel:pt[String(aid)]||'',statut,note:'',source:'ancien',maj:now,par:S.uid,cree:now,creePar:S.uid},false])}
- for(const [aid,list] of Object.entries(D.soins||{})){const pid=idOf[aid];if(pid)writes.push(['historique/'+pid,{soins:list,source:'ancien',maj:now},false])}
- for(const [aid,f] of Object.entries(D.fin||{})){const pid=idOf[aid];if(!pid)continue;const th=(f.a||[]).reduce((t,a)=>t+(a[3]-(a[4]||0)),0),tp=(f.p||[]).reduce((t,x)=>t+x[1],0);
-  writes.push(['finances/'+pid,{actes:f.a||[],paiements:f.p||[],totalHonoraires:Math.round(th*100)/100,totalPaye:Math.round(tp*100)/100,source:'ancien',maj:now},false])}
+ for(const [aid,list] of Object.entries(D.soins||{})){const pid=idOf[aid];if(pid)writes.push(['historique/'+pid,{soins:list.map(hS),source:'ancien',maj:now},false])}
+ for(const [aid,f] of Object.entries(D.fin||{})){const pid=idOf[aid];if(!pid)continue;const AA=(f.a||[]).map(hA),PP=(f.p||[]).map(hP);const th=AA.reduce((t,a)=>t+(a.prix-a.remise),0),tp=PP.reduce((t,x)=>t+x.m,0);
+  writes.push(['finances/'+pid,{actes:AA,paiements:PP,totalHonoraires:Math.round(th*100)/100,totalPaye:Math.round(tp*100)/100,source:'ancien',maj:now},false])}
  const N=writes.length;let done=0;
  for(let i=0;i<N;i+=400){const b=S.db.batch();writes.slice(i,i+400).forEach(([path,data,merge])=>b.set(S.db.doc(path),data,merge?{merge:true}:undefined));
   let tries=0;for(;;){try{await b.commit();break}catch(e){if(++tries>3||e.code==='permission-denied')throw e;await new Promise(r=>setTimeout(r,1500*tries))}}
