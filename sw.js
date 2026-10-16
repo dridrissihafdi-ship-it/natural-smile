@@ -1,5 +1,5 @@
 // Service worker Natural Smile : démarrage rapide, hors connexion et notifications.
-const VERSION = 'ns-v4';
+const VERSION = 'ns-v8';
 importScripts('config.js', 'firebase-app-compat.js', 'firebase-messaging-compat.js');
 try {
   firebase.initializeApp(self.NS_CONFIG.firebase);

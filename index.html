@@ -321,6 +321,8 @@ fieldset.fs{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:1
 .auth-switch button{border:0;background:none;color:var(--accent);font-weight:600;cursor:pointer;padding:6px}
 .install{display:flex;gap:14px;align-items:center}
 .install img{width:48px;height:48px;border-radius:12px;flex:none}
+.newpat{display:flex;flex-direction:column;gap:10px;padding:12px 14px;border-radius:14px;background:var(--accent-soft);color:var(--fg)}
+.newpat .fgrid[hidden],.newpat .perm[hidden]{display:none!important}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -344,6 +346,8 @@ fieldset.fs{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:1
 <input type="file" id="imgfile" accept="image/*" hidden>
 <input type="file" id="audfile" accept="audio/*" hidden>
 <input type="file" id="patfile" accept="image/*" hidden>
+<input type="file" id="histfile" accept=".gz,.json,application/gzip,application/json" hidden>
+<input type="file" id="impfile" accept=".xlsx,.xls,.csv,.ods,.txt,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden>
 <input type="file" id="labfile" accept="image/*" multiple hidden>
 
 <script src="firebase-app-compat.js"></script>
@@ -667,6 +671,9 @@ function rdvModal(r){r=r||{date:S.agDate,heure:'',duree:30,statut:'prevu'};const
  const praticiens=teamMembers().filter(u=>['dentiste','stagiaire'].includes(roleOf(u))).map(nameOf);
  const d=openModal({title:ro?'Rendez-vous':r.id?'Modifier le rendez-vous':'Nouveau rendez-vous',del:r.id&&perm('rdv_suppr')?'Supprimer':null,ok:ro?null:'Enregistrer',cancel:ro?'Fermer':'Annuler',
  body:`<fieldset class="fs" ${ro?'disabled':''}><label class="f">Patient<input class="inp" name="patient" id="rd-patient" required value="${esc(r.patient||'')}" autocomplete="off" list="dl-pat"></label><datalist id="dl-pat"></datalist>
+ ${perm('pat_edit')?`<div class="newpat" id="rd-newpat" hidden><div class="small"><b>Nouveau patient :</b> une fiche sera créée dans la liste des patients.</div>
+  <div class="fgrid"><label class="f">Nom<input class="inp" name="newNom" id="rd-newnom" autocomplete="off"></label><label class="f">Prénom<input class="inp" name="newPrenom" id="rd-newprenom" autocomplete="off"></label></div>
+  <label class="perm" style="border:0;padding:0"><input type="checkbox" name="mkpat" id="rd-mkpat" checked><span>Créer la fiche patient</span></label></div>`:''}
  ${r.patientId&&perm('pat_voir')?`<button type="button" class="btn ghost" data-act="rdvToPat" data-id="${esc(r.patientId)}" style="align-self:flex-start">${ic('folder')}Ouvrir la fiche patient</button>`:''}
  <div class="fgrid"><label class="f">Date<input class="inp" type="date" name="date" id="rd-date" value="${esc(r.date)}" required></label>
  <label class="f">Heure<input class="inp" type="time" name="heure" id="rd-heure" value="${esc(r.heure||'')}" step="300" required></label>
@@ -680,28 +687,119 @@ function rdvModal(r){r=r||{date:S.agDate,heure:'',duree:30,statut:'prevu'};const
  onOk:async f=>{if(!f.patient.trim()||!f.date||!f.heure){toast('Indiquez le patient, la date et l\'heure.','err');return false}
   const pick=S.patPick[f.patient];let patient=f.patient.trim(),patientId=r.patientId||null,tel=f.tel.trim();
   if(pick){patient=pick.nom;patientId=pick.id;if(!tel)tel=pick.tel||''}else if(patient!==(r.patient||'')){patientId=null}
+  if(!patientId&&perm('pat_edit')&&(f.mkpat||!$('#rd-mkpat'))){try{const pt=await findOrCreatePatient({full:patient,nom:f.newNom,prenom:f.newPrenom,tel});if(pt){patientId=pt.id;patient=pt.nom;if(!tel&&pt.tel)tel=pt.tel}}catch(e){console.warn(e)}}
   const data={patient,patientId,date:f.date,heure:f.heure,duree:Number(f.duree),acte:f.acte.trim(),praticien:f.praticien.trim(),tel,statut:f.statut,note:f.note.trim(),maj:Date.now(),par:S.uid};
   const ok=r.id?await W(()=>S.db.doc('rdv/'+r.id).update(data),'Rendez-vous modifié'):await W(()=>S.db.collection('rdv').add({...data,cree:Date.now(),creePar:S.uid}),'Rendez-vous ajouté');
   if(ok&&S.view==='agenda'&&f.date!==S.agDate){S.agDate=f.date;subRdvSel();refresh('agenda')}if(ok&&S.patient)loadPatRdv();return ok},
  onDel:async()=>{if(!await ask('Supprimer ce rendez-vous ?','Supprimer'))return false;const ok=await W(()=>S.db.doc('rdv/'+r.id).delete(),'Rendez-vous supprimé');if(ok&&S.patient)loadPatRdv();return ok}});
- const inp=$('#rd-patient',d);if(!ro&&perm('pat_voir'))inp.addEventListener('input',()=>later('rdpat',async()=>{const q=norm(inp.value);if(q.length<2||!S.db)return;
+ const inp=$('#rd-patient',d);const NP=$('#rd-newpat',d);
+ const syncNew=async()=>{if(!NP)return;const v=inp.value.trim();const linked=!!S.patPick[v]||(r.patientId&&v===(r.patient||''));
+  if(!v||linked){NP.hidden=true;return}let ex=null;try{ex=await findPatient(v,'')}catch(e){}if(inp.value.trim()!==v)return;
+  if(ex){NP.hidden=false;NP.querySelector('.small').innerHTML=`<b>Patient reconnu :</b> ${esc(patName(ex))} — le rendez-vous sera lié à sa fiche.`;NP.querySelector('.fgrid').hidden=true;NP.querySelector('.perm').hidden=true;return}
+  NP.querySelector('.small').innerHTML='<b>Nouveau patient :</b> une fiche sera créée dans la liste des patients.';NP.querySelector('.fgrid').hidden=false;NP.querySelector('.perm').hidden=false;NP.hidden=false;
+  const sp=splitName(v);const n=$('#rd-newnom',d),pr=$('#rd-newprenom',d);if(!n.dataset.touched)n.value=sp.nom;if(!pr.dataset.touched)pr.value=sp.prenom};
+ if(NP&&!ro){$('#rd-newnom',d).addEventListener('input',e=>e.target.dataset.touched=1);$('#rd-newprenom',d).addEventListener('input',e=>e.target.dataset.touched=1);
+  inp.addEventListener('input',()=>later('rdnew',syncNew,450));inp.addEventListener('change',()=>later('rdnew',syncNew,50));if(inp.value&&!r.patientId)syncNew()}
+ if(!ro&&perm('pat_voir'))inp.addEventListener('input',()=>later('rdpat',async()=>{const q=norm(inp.value);if(q.length<2||!S.db)return;
   try{const s=await S.db.collection('patients').where('cle','>=',q).where('cle','<=',q+'').limit(8).get();
    $('#dl-pat',d).innerHTML=s.docs.map(x=>{const p={id:x.id,...x.data()};const label=patName(p)+(p.tel?' ('+p.tel+')':'');S.patPick[label]={id:p.id,nom:patName(p),tel:p.tel};return `<option value="${esc(label)}">`}).join('')}catch(e){}},250))}
 
 /* ---- Patients ---- */
 const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
 const patName=p=>[p.nom,p.prenom].filter(Boolean).join(' ')||'Patient';
+/* ---- Import d'une liste de patients (Excel / CSV) ---- */
+const IMP_FIELDS=[['nom','Nom'],['prenom','Prénom'],['complet','Nom complet (nom + prénom)'],['tel','Téléphone'],['tel2','Téléphone 2'],['naissance','Date de naissance'],['sexe','Sexe'],['cin','CIN'],['adresse','Adresse'],['couv','Couverture / mutuelle'],['allergies','Allergies'],['antecedents','Antécédents'],['traitements','Traitements'],['notes','Notes / observations'],['dossier','N° de dossier']];
+const IMP_GUESS={nom:/^(nom|name|last ?name|surname|famille|النسب|الاسم العائلي|اللقب)$/,prenom:/^(prenom|first ?name|given|الاسم الشخصي|الاسم)$/,complet:/(nom (et|&) prenom|nom complet|full ?name|patient|nom prenom|الاسم الكامل|المريض)/,
+ tel:/^(tel|telephone|phone|mobile|gsm|portable|portable 1|tel 1|telephone 1|الهاتف|رقم الهاتف)$/,tel2:/(tel ?2|telephone 2|fixe|portable 2)/,naissance:/(naissance|date de nais|ddn|birth|dob|age|تاريخ الازدياد|تاريخ الميلاد)/,sexe:/^(sexe|genre|sex|gender|الجنس)$/,
+ cin:/^(cin|cni|carte|id|identite|البطاقة)$/,adresse:/(adresse|address|ville|العنوان)/,couv:/(mutuelle|couverture|assurance|cnops|cnss|amo|التغطية)/,allergies:/(allerg)/,antecedents:/(antecedent|atcd|medical|pathologie|السوابق)/,traitements:/(traitement|medicament)/,notes:/(note|observation|remarque|commentaire|ملاحظ)/,dossier:/(dossier|n° ?dossier|num|code|ref)/};
+function loadScriptOnce(src){return new Promise((res,rej)=>{if(document.querySelector(`script[data-src="${src}"]`)){res();return}const sc=document.createElement('script');sc.src=src;sc.dataset.src=src;sc.onload=res;sc.onerror=()=>rej(new Error('load'));document.head.appendChild(sc)})}
+function impDate(v){if(v==null||v==='')return '';if(v instanceof Date&&!isNaN(v))return dstr(v);if(typeof v==='number'&&v>1000&&v<80000){const d=new Date(Math.round((v-25569)*864e5));return d.toISOString().slice(0,10)}
+ const t=String(v).trim();let m=t.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);if(m){let y=+m[3];if(y<100)y+=y>30?1900:2000;return `${y}-${pad(+m[2])}-${pad(+m[1])}`}
+ m=t.match(/^(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})/);if(m)return `${m[1]}-${pad(+m[2])}-${pad(+m[3])}`;m=t.match(/^(\d{1,3})\s*ans?$/i);if(m){return `${new Date().getFullYear()-(+m[1])}-01-01`}return ''}
+function impSexe(v){const t=norm(v);if(/^(f|femme|feminin|female|انثى|أنثى)/.test(t))return 'F';if(/^(h|m|homme|masculin|male|ذكر)/.test(t))return 'H';return ''}
+function impCouv(v){const t=norm(v);if(!t)return 'Aucune';if(t.includes('cnops'))return 'CNOPS';if(t.includes('cnss')||t.includes('amo'))return 'CNSS (AMO)';if(/(assur|axa|saham|wafa|rma|allianz|sanlam|atlanta|mutuelle)/.test(t))return 'Assurance privée';if(/^(non|aucune?|sans|-|0)$/.test(t))return 'Aucune';return 'Autre'}
+$('#impfile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;toast('Lecture du fichier…');
+ try{await loadScriptOnce('xlsx.full.min.js');const buf=await f.arrayBuffer();const wb=XLSX.read(buf,{type:'array',cellDates:true,codepage:65001});
+  const sheets=wb.SheetNames.map(n=>({n,rows:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''}).filter(r=>r.some(c=>String(c).trim()!==''))})).filter(x=>x.rows.length);
+  if(!sheets.length){toast('Le fichier ne contient aucune ligne.','err');return}
+  impModal(sheets,f.name)}catch(err){console.warn(err);toast('Impossible de lire ce fichier. Enregistrez-le en .xlsx ou .csv puis réessayez.','err')}});
+function impModal(sheets,fname){let si=0;let hdr=true;
+ const d=openModal({title:'Importer des patients',ok:'Importer',body:`<div class="small muted">Fichier : ${esc(fname)}</div>
+  ${sheets.length>1?`<label class="f">Feuille<select class="inp" id="imp-sheet">${sheets.map((x,i)=>`<option value="${i}">${esc(x.n)} (${x.rows.length} lignes)</option>`).join('')}</select></label>`:''}
+  <label class="perm" style="border:0;padding:0"><input type="checkbox" id="imp-hdr" checked><span>La première ligne contient les titres des colonnes</span></label>
+  <div id="imp-map" class="stack" style="gap:8px"></div>
+  <label class="perm" style="border:0;padding:0"><input type="checkbox" id="imp-dup" checked><span>Ignorer les patients déjà présents (même nom, sans téléphone ni date de naissance différents)</span></label>
+  <div id="imp-prev"></div>`,
+  onOk:async()=>{const m=readMap();if(m.nom==null&&m.complet==null){toast('Choisissez au moins la colonne du nom.','err');return false}
+   const rows=sheets[si].rows.slice(hdr?1:0);return runImport(rows,m,$('#imp-dup',d).checked,$('#dlgok'))}});
+ const cols=()=>{const r=sheets[si].rows;const w=Math.max(...r.slice(0,50).map(x=>x.length));return Array.from({length:w},(_,i)=>hdr?String(r[0][i]??'').trim()||('Colonne '+(i+1)):'Colonne '+(i+1)+(r[0][i]!==''?' ('+String(r[0][i]).slice(0,18)+')':''))};
+ const guess=c=>{const used=new Set();const g={};IMP_FIELDS.forEach(([k])=>{const i=c.findIndex((h,j)=>!used.has(j)&&IMP_GUESS[k].test(norm(h)));if(i>=0&&hdr){g[k]=i;used.add(i)}});if(g.nom!=null&&g.complet!=null&&g.nom===g.complet)delete g.complet;return g};
+ function draw(){const c=cols();const g=guess(c);
+  $('#imp-map',d).innerHTML=`<div class="small"><b>Correspondance des colonnes</b> (vérifiez et corrigez si besoin)</div><div class="fgrid">${IMP_FIELDS.map(([k,l])=>`<label class="f">${esc(l)}<select class="inp" data-imp="${k}"><option value="">—</option>${c.map((h,i)=>`<option value="${i}" ${g[k]===i?'selected':''}>${esc(h)}</option>`).join('')}</select></label>`).join('')}</div>`;
+  $$('[data-imp]',d).forEach(x=>x.onchange=prev);prev()}
+ function readMap(){const m={};$$('[data-imp]',d).forEach(x=>{if(x.value!=='')m[x.dataset.imp]=+x.value});return m}
+ function prev(){const m=readMap();const rows=sheets[si].rows.slice(hdr?1:0);const P=rows.slice(0,4).map(r=>impRow(r,m)).filter(Boolean);
+  $('#imp-prev',d).innerHTML=`<div class="small"><b>${rows.length} ligne${rows.length>1?'s':''}</b> à importer. Aperçu :</div>${P.length?`<div class="tablewrap"><table><thead><tr><th>Nom</th><th>Prénom</th><th>Téléphone</th><th>Naissance</th></tr></thead><tbody>${P.map(p=>`<tr><td>${esc(p.nom)}</td><td>${esc(p.prenom)}</td><td>${esc(p.tel)}</td><td>${esc(p.naissance)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="small muted">Choisissez la colonne du nom pour voir l\'aperçu.</div>'}`}
+ const sh=$('#imp-sheet',d);if(sh)sh.onchange=()=>{si=+sh.value;draw()};$('#imp-hdr',d).onchange=e=>{hdr=e.target.checked;draw()};draw()}
+function impRow(r,m){const g=k=>m[k]==null?'':String(r[m[k]]??'').trim();let nom=g('nom'),prenom=g('prenom');
+ if(!nom&&m.complet!=null){const sp=splitName(g('complet'));nom=sp.nom;prenom=prenom||sp.prenom}else if(nom&&!prenom&&m.prenom==null&&/\s/.test(nom)&&m.complet==null){/* nom complet dans la colonne Nom */const sp=splitName(nom);nom=sp.nom;prenom=sp.prenom}
+ if(!nom)return null;nom=nom.toUpperCase();prenom=prenom.toLowerCase().replace(/(^|[\s-])(\p{L})/gu,(x,a,b)=>a+b.toUpperCase());
+ let tel=g('tel');if(/^\d{9}$/.test(tel.replace(/\D/g,''))&&!tel.startsWith('0'))tel='0'+tel;const tel2=g('tel2');
+ const notes=[g('dossier')?'N° dossier : '+g('dossier'):'',tel2?'Téléphone 2 : '+tel2:'',g('notes')].filter(Boolean).join('\n');
+ return{nom,prenom,cle:norm(nom+' '+prenom),cle2:norm(prenom+' '+nom),tel,telN:tel.replace(/\D/g,''),naissance:impDate(m.naissance==null?'':r[m.naissance]),sexe:impSexe(g('sexe')),cin:g('cin').toUpperCase(),
+  couv:impCouv(g('couv')),adresse:g('adresse'),antecedents:g('antecedents'),allergies:/^(non|aucune?|rien|-|ras|0)$/i.test(g('allergies'))?'':g('allergies'),traitements:g('traitements'),notes,source:'import'}}
+async function runImport(rows,m,skipDup,btn){if(btn)btn.disabled=true;
+ try{const list=rows.map(r=>impRow(r,m)).filter(Boolean);if(!list.length){toast('Aucune ligne valide (nom manquant).','err');return false}
+  const seen=new Map();const addSeen=(k,x)=>{if(!k)return;if(!seen.has(k))seen.set(k,[]);seen.get(k).push(x)};
+  const isDup=p=>[p.cle,p.cle2].some(k=>(seen.get(k)||[]).some(o=>(!o.t||!p.telN||o.t===p.telN)&&(!o.d||!p.naissance||o.d===p.naissance)));
+  if(skipDup){toast('Vérification des doublons…');const s=await S.db.collection('patients').get();s.docs.forEach(x=>{const p=x.data();const o={t:p.telN||'',d:p.naissance||''};addSeen(p.cle,o);addSeen(p.cle2,o)})}
+  let added=0,skipped=0;let batch=S.db.batch(),n=0;const now=Date.now();
+  for(const p of list){if(skipDup&&isDup(p)){skipped++;continue}
+   const o={t:p.telN,d:p.naissance};addSeen(p.cle,o);addSeen(p.cle2,o);
+   batch.set(S.db.collection('patients').doc(),{...p,maj:now-added,par:S.uid,cree:now,creePar:S.uid});n++;added++;
+   if(n===400){toast(`Import : ${added} patients…`);await batch.commit();batch=S.db.batch();n=0}}
+  if(n)await batch.commit();
+  toast(`${added} patient${added>1?'s':''} importé${added>1?'s':''}${skipped?`, ${skipped} déjà présent${skipped>1?'s':''} ignoré${skipped>1?'s':''}`:''}`);searchPatients();countUnlinked();return true}
+ catch(e){console.warn(e);toast(errMsg(e),'err');if(btn)btn.disabled=false;return false}}
+function splitName(full){const w=String(full||'').trim().split(/\s+/).filter(Boolean);if(!w.length)return{nom:'',prenom:''};
+ const caps=w.filter(x=>x.length>1&&x===x.toUpperCase()&&/\p{L}/u.test(x));
+ if(caps.length&&caps.length<w.length)return{nom:caps.join(' '),prenom:w.filter(x=>!caps.includes(x)).join(' ')};
+ if(w.length===1)return{nom:w[0],prenom:''};let k=1;const PART=['el','al','ben','bel','ben','bou','abou','abu','ait','aït','ibn','ould','ou','de','du','la','le','d\'','el-','al-'];while(k<w.length-1&&PART.includes(w[k-1].toLowerCase()))k++;return{nom:w.slice(0,k).join(' '),prenom:w.slice(k).join(' ')}}
+async function findPatient(full,tel){const P=S.db.collection('patients');const q=norm(full);
+ if(q){for(const k of ['cle','cle2']){const s=await P.where(k,'==',q).limit(1).get();if(!s.empty)return{id:s.docs[0].id,...s.docs[0].data()}}}
+ const d=String(tel||'').replace(/\D/g,'');if(d.length>=9){const s=await P.where('telN','==',d).limit(1).get();if(!s.empty){const x={id:s.docs[0].id,...s.docs[0].data()};if(!q||norm(patName(x)).split(' ').some(w=>q.includes(w)))return x}}
+ return null}
+async function findOrCreatePatient({full,nom,prenom,tel}){full=String(full||'').trim();if(!full&&!nom)return null;
+ let ex=null;try{ex=await findPatient(full,tel)}catch(e){console.warn(e)}if(!ex&&nom){try{ex=await findPatient(nom+' '+(prenom||''),'')}catch(e){}}
+ if(ex)return{id:ex.id,nom:patName(ex),tel:ex.tel||''};
+ const sp=splitName(full);nom=String(nom||sp.nom).trim().toUpperCase();prenom=String(prenom==null||prenom===''&&!nom?sp.prenom:prenom).trim().replace(/(^|[\s-])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase());
+ if(!nom)return null;const ref=S.db.collection('patients').doc();
+ await ref.set({nom,prenom,cle:norm(nom+' '+prenom),cle2:norm(prenom+' '+nom),tel:tel||'',telN:String(tel||'').replace(/\D/g,''),naissance:'',sexe:'',cin:'',couv:'Aucune',adresse:'',antecedents:'',allergies:'',traitements:'',notes:'',source:'agenda',maj:Date.now(),par:S.uid,cree:Date.now(),creePar:S.uid});
+ toast('Fiche patient créée : '+[nom,prenom].filter(Boolean).join(' '));return{id:ref.id,nom:[nom,prenom].filter(Boolean).join(' '),tel:tel||''}}
+async function countUnlinked(){const el=$('#patSync');if(!el||!S.db||!perm('pat_edit')||!perm('rdv_voir'))return;
+ try{const s=await S.db.collection('rdv').where('patientId','==',null).limit(500).get();const n=new Set(s.docs.map(d=>norm(d.data().patient)).filter(Boolean)).size;
+  el.hidden=!n;if(n)el.innerHTML=`<div class="card-h"><h3>Patients de l'agenda sans fiche</h3></div><div class="small muted">${n} patient${n>1?'s':''} saisi${n>1?'s':''} directement dans l'agenda n'${n>1?'ont':'a'} pas encore de fiche.</div><button class="btn pri" data-act="syncAgenda" style="align-self:flex-start">${ic('folder')}Créer les fiches et lier les rendez-vous</button>`}catch(e){console.warn(e);el.hidden=true}}
+async function syncAgenda(btn){if(btn)btn.disabled=true;let made=0,linked=0;
+ try{const s=await S.db.collection('rdv').where('patientId','==',null).limit(500).get();const groups={};
+  s.docs.forEach(d=>{const x=d.data();const k=norm(x.patient);if(!k)return;(groups[k]=groups[k]||{full:x.patient,tel:'',ids:[]}).ids.push(d.id);if(x.tel&&!groups[k].tel)groups[k].tel=x.tel});
+  const keys=Object.keys(groups);let i=0;
+  for(const k of keys){i++;toast(`Patients ${i} sur ${keys.length}…`);const g=groups[k];const before=S.patCreated||0;
+   const pt=await findOrCreatePatient({full:g.full,tel:g.tel});if(!pt)continue;made++;
+   for(const id of g.ids){await S.db.doc('rdv/'+id).update({patientId:pt.id,patient:pt.nom,...(g.tel?{}:pt.tel?{tel:pt.tel}:{})});linked++}}
+  toast(`${made} fiche${made>1?'s':''} prête${made>1?'s':''}, ${linked} rendez-vous lié${linked>1?'s':''}`)}catch(e){console.warn(e);toast(errMsg(e),'err')}
+ searchPatients();countUnlinked()}
 const initials=p=>((p.nom||'?')[0]+((p.prenom||'')[0]||'')).toUpperCase();
 const ageOf=d=>{if(!d)return '';const b=new Date(d+'T12:00:00'),n=new Date();let a=n.getFullYear()-b.getFullYear();if(n<new Date(n.getFullYear(),b.getMonth(),b.getDate()))a--;return a>=0&&a<130?a+' ans':''};
 const COUV=['Aucune','CNOPS','CNSS (AMO)','Assurance privée','Autre'];
 const DTYPES={radio:'Radio',photo:'Photo',document:'Document'};
 Views.patients={
  mount(el){if(S.patient){el.innerHTML=`<div class="stack"><div class="chat-head"><button class="ib" data-act="closePat" aria-label="Retour à la liste">${ic('left')}</button><div style="min-width:0;flex:1" id="patHead"></div></div><div id="patBody" class="stack"></div></div>`;return}
-  el.innerHTML=`<div class="stack"><div><h1>Patients</h1><div class="muted">Recherchez par nom, prénom ou téléphone.</div></div>${banners()}
+  el.innerHTML=`<div class="stack"><div class="head"><div><h1>Patients</h1><div class="muted">Recherchez par nom, prénom ou téléphone.</div></div><span class="sp"></span><div class="row">${perm('pat_edit')?`<button class="btn ghost" data-act="patImport">${ic('plus')}Importer une liste</button>`:''}${S.isOwner?`<button class="btn ghost" data-act="histImport">${ic('refresh')}Importer l'historique</button>`:''}</div></div>${banners()}
   <div class="searchbar">${ic('search')}<input class="inp" id="patq" type="search" placeholder="Nom, prénom ou téléphone" autocomplete="off" value="${esc(S.patQ||'')}" aria-label="Rechercher un patient"></div>
+  <section class="card stack" style="gap:8px" id="patSync" hidden></section>
   <div class="card" style="padding-block:4px" id="patList"><div class="small muted" style="padding:12px 2px">Chargement…</div></div></div>
   ${perm('pat_edit')?`<button class="btn pri big fab" data-act="patNew">${ic('plus')}Patient</button>`:''}`;
-  $('#patq').addEventListener('input',e=>{S.patQ=e.target.value;later('patq',searchPatients,300)});searchPatients()},
+  $('#patq').addEventListener('input',e=>{S.patQ=e.target.value;later('patq',searchPatients,300)});searchPatients();countUnlinked()},
  update(){if(S.patient)updatePatient()}};
 async function searchPatients(){const L=$('#patList');if(!L)return;if(!S.db){L.innerHTML='';return}const q=norm(S.patQ);let res=[];
  try{if(!q){const s=await S.db.collection('patients').orderBy('maj','desc').limit(30).get();res=s.docs.map(d=>({id:d.id,...d.data()}))}
@@ -714,10 +812,65 @@ async function searchPatients(){const L=$('#patList');if(!L)return;if(!S.db){L.i
  if(norm(S.patQ)!==q||!$('#patList'))return;
  L.innerHTML=res.length?(q?'':'<div class="small muted" style="padding:12px 2px 2px">Dossiers modifiés récemment</div>')+res.map(p=>`<div class="li" style="cursor:pointer" data-act="openPat" data-id="${esc(p.id)}"><div class="avatar">${esc(initials(p))}</div><div class="grow"><div class="t">${esc(patName(p))}</div><div class="s">${esc([ageOf(p.naissance),p.tel].filter(Boolean).join(', ')||'Aucune coordonnée')}</div></div>${p.allergies?'<span class="pill bad">Allergie</span>':''}</div>`).join('')
   :`<div class="empty"><strong>${q?'Aucun patient trouvé':'Aucun dossier patient'}</strong>${perm('pat_edit')?'Créez la fiche avec le bouton « Patient ».':q?'Vérifiez l\'orthographe ou cherchez par téléphone.':''}</div>`}
-function openPatient(id){closePatient();S.patient=id;S.patDoc=null;S.patDocs=[];S.patRdv=[];S.patFilter='tout';
+function openPatient(id){closePatient();S.histAll=false;S.rdvAll=false;S.patient=id;S.patDoc=null;S.patDocs=[];S.patRdv=[];S.patFilter='tout';
  if(S.db){S.subs.pat=S.db.doc('patients/'+id).onSnapshot(s=>{S.patDoc=s.exists?{id,...s.data()}:false;refresh('patients')},e=>console.warn(e));
-  S.subs.patDocs=S.db.collection(`patients/${id}/docs`).orderBy('ts','desc').limit(300).onSnapshot(s=>{S.patDocs=s.docs.map(d=>({id:d.id,...d.data()}));refresh('patients')},e=>console.warn(e));loadPatRdv()}
+  S.subs.patDocs=S.db.collection(`patients/${id}/docs`).orderBy('ts','desc').limit(300).onSnapshot(s=>{S.patDocs=s.docs.map(d=>({id:d.id,...d.data()}));refresh('patients')},e=>console.warn(e));loadPatRdv();loadPatHist(id)}
  go('patients')}
+async function loadPatHist(id){S.patHist=null;S.patFin=null;
+ try{if(perm('pat_voir')){const h=await S.db.doc('historique/'+id).get();if(S.patient!==id)return;S.patHist=h.exists?h.data():null}}catch(e){}
+ try{if(S.isOwner){const f=await S.db.doc('finances/'+id).get();if(S.patient!==id)return;S.patFin=f.exists?f.data():null}}catch(e){}
+ refresh('patients')}
+const MAD0=n=>new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(n||0)+' DH';
+function histHTML(){const h=S.patHist?.soins||[];if(!h.length)return '';const L=[...h].reverse();const more=L.length>12&&!S.histAll;
+ return `<section class="card"><div class="card-h"><h3>Historique des soins</h3><span class="sp"></span><span class="small muted">${h.length} acte${h.length>1?'s':''}</span></div>
+ <div class="tablewrap"><table><thead><tr><th>Date</th><th>Dent</th><th>Acte</th></tr></thead><tbody>${(more?L.slice(0,12):L).map(x=>`<tr><td class="num" style="white-space:nowrap">${esc(x[0]?fmtDate(x[0],{day:'2-digit',month:'2-digit',year:'numeric'}):'')}</td><td>${esc(x[1])}</td><td>${esc(x[2])}${x[3]?`<div class="small muted">${esc(x[3])}</div>`:''}</td></tr>`).join('')}</tbody></table></div>
+ ${more?`<button class="btn ghost" data-act="histAll" style="margin-top:8px">Afficher tout l'historique</button>`:''}</section>`}
+function finHTML(){if(!S.isOwner||!S.patFin)return '';const f=S.patFin;const A=f.actes||[],P=f.paiements||[];
+ const th=A.reduce((t,a)=>t+(a[3]-(a[4]||0)),0),tp=P.reduce((t,x)=>t+x[1],0),r=th-tp;const MO={especes:'Espèces',carte:'Carte',cheque:'Chèque',virement:'Virement'};
+ return `<section class="card stack" style="gap:12px"><div class="card-h"><h3>Honoraires et paiements</h3><span class="sp"></span><span class="pill acc">${ic('lock')}Visible par vous seul</span></div>
+ <div class="mini-kpis"><div class="kpi"><b>${MAD0(th)}</b><span class="small muted">honoraires</span></div><div class="kpi"><b>${MAD0(tp)}</b><span class="small muted">payé</span></div><div class="kpi"><b style="color:${r>0.5?'var(--bad)':'var(--ok)'}">${MAD0(r)}</b><span class="small muted">${r>0.5?'reste à payer':r<-0.5?'avance':'soldé'}</span></div></div>
+ ${P.length?`<div><div class="small" style="font-weight:600;margin-bottom:4px">Paiements (${P.length})</div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Mode</th><th class="r">Montant</th></tr></thead><tbody>${[...P].reverse().map(x=>`<tr><td class="num">${esc(x[0]?fmtDate(x[0],{day:'2-digit',month:'2-digit',year:'numeric'}):'')}</td><td>${esc(MO[x[2]]||x[2]||'')}${x[3]?`<div class="small muted">${esc(x[3])}</div>`:''}</td><td class="r num">${MAD0(x[1])}</td></tr>`).join('')}</tbody></table></div></div>`:''}
+ ${A.length?`<details><summary class="small" style="cursor:pointer;font-weight:600">Détail des honoraires (${A.length} actes)</summary><div class="tablewrap"><table><thead><tr><th>Date</th><th>Acte</th><th class="r">Prix</th></tr></thead><tbody>${[...A].reverse().map(a=>`<tr><td class="num">${esc(a[0]?fmtDate(a[0],{day:'2-digit',month:'2-digit',year:'numeric'}):'')}</td><td>${esc(a[2])}${a[1]?` <span class="small muted">(${esc(a[1])})</span>`:''}</td><td class="r num">${MAD0(a[3]-(a[4]||0))}</td></tr>`).join('')}</tbody></table></div></details>`:''}</section>`}
+/* ---- Import de l'historique de l'ancien logiciel ---- */
+async function readImportFile(f){let buf=await f.arrayBuffer();const u=new Uint8Array(buf);
+ if(u[0]===0x1f&&u[1]===0x8b){if(!window.DecompressionStream)throw new Error('gz');const st=new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));buf=await new Response(st).arrayBuffer()}
+ return JSON.parse(new TextDecoder('utf-8').decode(buf))}
+$('#histfile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f||!S.isOwner)return;toast('Lecture du fichier…');
+ let data;try{data=await readImportFile(f)}catch(err){console.warn(err);toast(err.message==='gz'?'Ce navigateur ne sait pas décompresser le fichier : utilisez Chrome ou Safari récent.':'Fichier illisible. Choisissez historique-natural-smile.json.gz.','err');return}
+ if(!data||!Array.isArray(data.patients)||!Array.isArray(data.rdv)){toast('Ce fichier n\'est pas un historique Natural Smile.','err');return}
+ const nS=Object.values(data.soins||{}).reduce((t,v)=>t+v.length,0),nP=Object.values(data.fin||{}).reduce((t,v)=>t+(v.p||[]).length,0);
+ openModal({title:'Importer l\'historique',ok:'Lancer l\'import',body:`<p style="margin:0">Le fichier contient :</p>
+  <div class="list"><div class="li"><div class="grow t">Patients</div><b class="num">${data.patients.length}</b></div><div class="li"><div class="grow t">Rendez-vous</div><b class="num">${data.rdv.length}</b></div><div class="li"><div class="grow t">Actes de soins</div><b class="num">${nS}</b></div><div class="li"><div class="grow t">Paiements</div><b class="num">${nP}</b></div></div>
+  <div class="small muted">Les patients déjà présents (même nom, téléphone ou date de naissance compatibles) sont complétés au lieu d'être dupliqués. Les honoraires et paiements ne sont visibles que par vous. L'import prend quelques minutes : gardez cette page ouverte. Vous pouvez le relancer sans créer de doublons.</div>
+  <div id="histProg" class="stack" style="gap:6px" hidden><div class="progress"><i id="histBar" style="width:0%"></i></div><div class="small muted" id="histTxt"></div></div>`,
+  onOk:async()=>{const b=$('#dlgok');b.disabled=true;$('#dlg [data-close]')?.setAttribute('disabled','');try{await runHistImport(data)}catch(err){console.warn(err);toast(errMsg(err),'err');b.disabled=false;return false}return true}})});
+async function runHistImport(D){const prog=$('#histProg');prog.hidden=false;const setP=(x,t)=>{$('#histBar').style.width=Math.round(x*100)+'%';$('#histTxt').textContent=t};
+ setP(0.01,'Lecture des patients existants…');
+ const ex=await S.db.collection('patients').get();const byId=new Set(),byAid=new Map(),byKey=new Map();
+ ex.docs.forEach(d=>{const p=d.data();byId.add(d.id);if(p.ancienId!=null)byAid.set(String(p.ancienId),d.id);const o={id:d.id,t:p.telN||'',d:p.naissance||''};[p.cle,p.cle2].forEach(k=>{if(k){if(!byKey.has(k))byKey.set(k,[]);byKey.get(k).push(o)}})});
+ const used=new Set();const idOf={};const writes=[];const now=Date.now();
+ for(const p of D.patients){const aid=String(p.aid);const nom=p.nom,prenom=p.prenom||'';const cle=norm(nom+' '+prenom),cle2=norm(prenom+' '+nom);const telN=String(p.tel||'').replace(/\D/g,'');
+  let id=byId.has('old_'+aid)?'old_'+aid:byAid.get(aid);
+  if(!id){const cands=[...(byKey.get(cle)||[]),...(byKey.get(cle2)||[])].filter(o=>!used.has(o.id)&&(!o.t||!telN||o.t===telN)&&(!o.d||!p.naissance||o.d===p.naissance));if(cands.length)id=cands[0].id}
+  if(id&&id!=='old_'+aid){used.add(id);writes.push(['patients/'+id,{ancienId:p.aid},true])}
+  else{id='old_'+aid;writes.push(['patients/'+id,{nom,prenom,cle,cle2,tel:p.tel||'',telN,naissance:p.naissance||'',sexe:p.sexe||'',cin:p.cin||'',couv:p.couv||'Aucune',adresse:p.adresse||'',antecedents:'',allergies:'',traitements:'',notes:p.notes||'',source:'ancien',ancienId:p.aid,maj:now-writes.length,par:S.uid,cree:now,creePar:S.uid},true])}
+  idOf[aid]=id}
+ const pn={};D.patients.forEach(p=>pn[String(p.aid)]=[p.nom,p.prenom].filter(Boolean).join(' '));const pt={};D.patients.forEach(p=>pt[String(p.aid)]=p.tel||'');
+ setP(0.03,'Vérification des rendez-vous à venir…');
+ const fut=await S.db.collection('rdv').where('date','>=',today()).get();const futKey=new Set(fut.docs.filter(d=>!d.id.startsWith('old_')).map(d=>{const x=d.data();return x.patientId+'|'+x.date+'|'+x.heure}));
+ let skipped=0;
+ for(const r of D.rdv){const [eid,aid,date,heure,duree,acte,statut]=r;const pid=idOf[String(aid)];if(!pid){skipped++;continue}
+  if(futKey.has(pid+'|'+date+'|'+heure)){skipped++;continue}
+  writes.push(['rdv/old_ev_'+eid,{patient:pn[String(aid)]||'Patient',patientId:pid,date,heure,duree,acte:acte||'',praticien:'',tel:pt[String(aid)]||'',statut,note:'',source:'ancien',maj:now,par:S.uid,cree:now,creePar:S.uid},false])}
+ for(const [aid,list] of Object.entries(D.soins||{})){const pid=idOf[aid];if(pid)writes.push(['historique/'+pid,{soins:list,source:'ancien',maj:now},false])}
+ for(const [aid,f] of Object.entries(D.fin||{})){const pid=idOf[aid];if(!pid)continue;const th=(f.a||[]).reduce((t,a)=>t+(a[3]-(a[4]||0)),0),tp=(f.p||[]).reduce((t,x)=>t+x[1],0);
+  writes.push(['finances/'+pid,{actes:f.a||[],paiements:f.p||[],totalHonoraires:Math.round(th*100)/100,totalPaye:Math.round(tp*100)/100,source:'ancien',maj:now},false])}
+ const N=writes.length;let done=0;
+ for(let i=0;i<N;i+=400){const b=S.db.batch();writes.slice(i,i+400).forEach(([path,data,merge])=>b.set(S.db.doc(path),data,merge?{merge:true}:undefined));
+  let tries=0;for(;;){try{await b.commit();break}catch(e){if(++tries>3||e.code==='permission-denied')throw e;await new Promise(r=>setTimeout(r,1500*tries))}}
+  done=Math.min(N,i+400);setP(0.05+0.95*done/N,`${done} / ${N} éléments enregistrés…`)}
+ setP(1,'Import terminé.');toast(`Historique importé : ${D.patients.length} patients, ${D.rdv.length-skipped} rendez-vous${skipped?` (${skipped} ignorés)`:''}`);
+ try{searchPatients();countUnlinked();subRdvSel()}catch(e){console.warn(e)}}
 function closePatient(){S.subs.pat?.();S.subs.patDocs?.();S.subs.pat=S.subs.patDocs=null;S.patient=null}
 async function loadPatRdv(){const id=S.patient;if(!id||!S.db)return;try{const s=await S.db.collection('rdv').where('patientId','==',id).get();if(S.patient!==id)return;S.patRdv=s.docs.map(d=>({id:d.id,...d.data()}));refresh('patients')}catch(e){}}
 function updatePatient(){const p=S.patDoc;const H=$('#patHead'),B=$('#patBody');if(!H)return;
@@ -738,7 +891,8 @@ function updatePatient(){const p=S.patDoc;const H=$('#patHead'),B=$('#patBody');
    :`<div class="empty"><strong>Aucun fichier</strong>${up?'Ajoutez une radio panoramique, une rétro-alvéolaire, un cône beam en capture ou des photos cliniques.':perm('pat_docs')?'L\'ajout de fichiers demande un accès Éditeur à la page.':''}</div>`}
  </section>
  ${perm('labo_voir')&&S.labo.some(c=>c.patientId===p.id)?`<section class="card"><div class="card-h"><h3>Laboratoire</h3></div><div class="list">${S.labo.filter(c=>c.patientId===p.id).map(c=>`<div class="li" style="cursor:pointer" data-act="labOpen" data-id="${esc(c.id)}"><div class="grow"><div class="t">${esc(c.travail||'Travail')}${c.dents?', dent '+esc(c.dents):''}</div><div class="s">${esc(LAB[c.section]?.nom||'')}, ${esc(LAB[c.section]?.steps[labStepIdx(c)]?.[1]||'')}</div></div>${labDue(c)}</div>`).join('')}</div></section>`:''}
- <section class="card"><div class="card-h"><h3>Rendez-vous</h3></div>${rdvs.length?`<div class="list">${rdvs.map(r=>`<div class="li" style="cursor:pointer" data-act="patRdvOpen" data-id="${esc(r.id)}"><div class="grow"><div class="t">${esc(capFirst(fmtDate(r.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})))}, ${esc(r.heure||'')}</div><div class="s">${esc(r.acte||'')}</div></div><span class="pill ${STATUT_CLS[r.statut]||''}">${esc(STATUTS[r.statut]||'Prévu')}</span></div>`).join('')}</div>`:'<div class="small muted">Aucun rendez-vous lié à ce dossier.</div>'}</section>`}
+ ${finHTML()}${histHTML()}
+ <section class="card"><div class="card-h"><h3>Rendez-vous</h3><span class="sp"></span>${rdvs.length?`<span class="small muted">${rdvs.length}</span>`:''}</div>${rdvs.length?`<div class="list">${(S.rdvAll?rdvs:rdvs.slice(0,15)).map(r=>`<div class="li" style="cursor:pointer" data-act="patRdvOpen" data-id="${esc(r.id)}"><div class="grow"><div class="t">${esc(capFirst(fmtDate(r.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})))}, ${esc(r.heure||'')}</div><div class="s">${esc(r.acte||'')}</div></div><span class="pill ${STATUT_CLS[r.statut]||''}">${esc(STATUTS[r.statut]||'Prévu')}</span></div>`).join('')}</div>${rdvs.length>15&&!S.rdvAll?`<button class="btn ghost" data-act="rdvAll" style="margin-top:8px">Afficher les ${rdvs.length} rendez-vous</button>`:''}`:'<div class="small muted">Aucun rendez-vous lié à ce dossier.</div>'}</section>`}
 function patModal(p){p=p||{};
  openModal({title:p.id?'Modifier la fiche':'Nouveau patient',del:p.id&&perm('pat_suppr')?'Supprimer le dossier':null,
  body:`<div class="fgrid"><label class="f">Nom<input class="inp" name="nom" id="pt-nom" required value="${esc(p.nom||'')}" autocomplete="off"></label><label class="f">Prénom<input class="inp" name="prenom" id="pt-prenom" value="${esc(p.prenom||'')}" autocomplete="off"></label></div>
@@ -1249,7 +1403,7 @@ const Acts={
  reDel:async a=>{if(!await ask('Supprimer cet encaissement ?','Supprimer'))return;if(await W(()=>S.db.doc(`recettes/${a.dataset.u}/e/${a.dataset.id}`).delete(),'Encaissement supprimé'))loadRecettes()},
  ptLoad:loadTeam,regEdit,regAccept:()=>W(()=>S.db.doc('annuaire/'+S.uid).update({reglementLu:S.cfg.reglement.version}),'Merci, acceptation enregistrée'),
  grpEdit:a=>grpEdit(a.dataset.id),
- memPerms:a=>memPerms(a.dataset.u),authMode:a=>{S.authMode=a.dataset.m;go('attente')},
+ memPerms:a=>memPerms(a.dataset.u),histImport:()=>$('#histfile').click(),histAll:()=>{S.histAll=true;updatePatient()},rdvAll:()=>{S.rdvAll=true;updatePatient()},patImport:()=>$('#impfile').click(),syncAgenda:a=>syncAgenda(a),authMode:a=>{S.authMode=a.dataset.m;go('attente')},
  verifyResend:async()=>{try{await firebase.auth().currentUser.sendEmailVerification();toast('Lien renvoyé')}catch(e){toast(authMsg(e),'err')}},
  verifyCheck:async()=>{const u=firebase.auth().currentUser;await u.reload();if(u.emailVerified){await u.getIdToken(true);location.reload()}else toast('E-mail pas encore confirmé.','err')},
  installApp:installApp,memDelete:a=>memDelete(a.dataset.u),memReset:a=>memReset(a.dataset.u),logout,
