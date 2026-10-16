@@ -797,12 +797,33 @@ Views.patients={
   el.innerHTML=`<div class="stack"><div class="head"><div><h1>Patients</h1><div class="muted">Recherchez par nom, prénom ou téléphone.</div></div><span class="sp"></span><div class="row">${perm('pat_edit')?`<button class="btn ghost" data-act="patImport">${ic('plus')}Importer une liste</button>`:''}${S.isOwner?`<button class="btn ghost" data-act="histImport">${ic('refresh')}Importer l'historique</button>`:''}</div></div>${banners()}
   <div class="searchbar">${ic('search')}<input class="inp" id="patq" type="search" placeholder="Nom, prénom ou téléphone" autocomplete="off" value="${esc(S.patQ||'')}" aria-label="Rechercher un patient"></div>
   <section class="card stack" style="gap:8px" id="patSync" hidden></section>
+  <div class="row" style="gap:8px;flex-wrap:wrap" id="patTabs"></div>
   <div class="card" style="padding-block:4px" id="patList"><div class="small muted" style="padding:12px 2px">Chargement…</div></div></div>
   ${perm('pat_edit')?`<button class="btn pri big fab" data-act="patNew">${ic('plus')}Patient</button>`:''}`;
   $('#patq').addEventListener('input',e=>{S.patQ=e.target.value;later('patq',searchPatients,300)});searchPatients();countUnlinked()},
  update(){if(S.patient)updatePatient()}};
+const PAT_PAGE=50;
+function patTabsHTML(){const m=S.patMode||'az',L=S.patLetter||'';
+ return `<button class="btn ${m==='az'?'pri':'ghost'}" data-act="patMode" data-m="az">Tous les patients (A–Z)</button><button class="btn ${m==='recent'?'pri':'ghost'}" data-act="patMode" data-m="recent">Récents</button>`+
+ (m==='az'?`<div class="row" style="gap:4px;flex-wrap:wrap;width:100%">${['','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'].map(x=>`<button class="btn ${L===x?'pri':'ghost'}" style="min-width:36px;padding:6px 8px" data-act="patLetter" data-l="${x}">${x||'Tout'}</button>`).join('')}</div>`:'')}
+function patRow(p){return `<div class="li" style="cursor:pointer" data-act="openPat" data-id="${esc(p.id)}"><div class="avatar">${esc(initials(p))}</div><div class="grow"><div class="t">${esc(patName(p))}</div><div class="s">${esc([ageOf(p.naissance),p.tel].filter(Boolean).join(', ')||'Aucune coordonnée')}</div></div>${p.allergies?'<span class="pill bad">Allergie</span>':''}</div>`}
+async function loadPatPage(more){const L=$('#patList');if(!L||!S.db)return;
+ if(!more){S.patRows=[];S.patLast=null;S.patEnd=false}
+ const key=(S.patMode||'az')+'|'+(S.patLetter||'');S.patKey=key;
+ let q=S.db.collection('patients');
+ if((S.patMode||'az')==='recent')q=q.orderBy('maj','desc');
+ else{const l=(S.patLetter||'').toLowerCase();q=q.orderBy('cle');if(l)q=q.where('cle','>=',l).where('cle','<',l+'\uf8ff')}
+ if(S.patLast)q=q.startAfter(S.patLast);
+ try{const s=await q.limit(PAT_PAGE).get();if(S.patKey!==key||norm(S.patQ)||!$('#patList'))return;
+  S.patRows.push(...s.docs.map(d=>({id:d.id,...d.data()})));S.patLast=s.docs[s.docs.length-1]||S.patLast;S.patEnd=s.docs.length<PAT_PAGE}
+ catch(e){console.warn(e);L.innerHTML='<div class="empty"><strong>Chargement impossible</strong>Vérifiez la connexion et réessayez.</div>';return}
+ const n=S.patRows.length;
+ L.innerHTML=n?`<div class="small muted" style="padding:12px 2px 2px">${(S.patMode||'az')==='recent'?'Dossiers modifiés récemment':'Patients'+(S.patLetter?' : '+S.patLetter:'')+' — '+n+' affiché'+(n>1?'s':'')}</div>`+S.patRows.map(patRow).join('')+(S.patEnd?'':`<div style="padding:12px 0;text-align:center"><button class="btn ghost" data-act="patMore">Afficher plus</button></div>`)
+  :`<div class="empty"><strong>Aucun patient${S.patLetter?' commençant par '+esc(S.patLetter):''}</strong></div>`}
 async function searchPatients(){const L=$('#patList');if(!L)return;if(!S.db){L.innerHTML='';return}const q=norm(S.patQ);let res=[];
- try{if(!q){const s=await S.db.collection('patients').orderBy('maj','desc').limit(30).get();res=s.docs.map(d=>({id:d.id,...d.data()}))}
+ const T=$('#patTabs');if(T){T.hidden=!!q;T.innerHTML=q?'':patTabsHTML()}
+ if(!q){return loadPatPage(false)}
+ try{if(!q){}
   else{const P=S.db.collection('patients');const digits=q.replace(/[\s.\-]/g,'');
    const qs=[P.where('cle','>=',q).where('cle','<=',q+'').limit(25).get(),P.where('cle2','>=',q).where('cle2','<=',q+'').limit(25).get()];
    if(/^\+?\d{3,}$/.test(digits))qs.push(P.where('telN','>=',digits.replace('+','')).where('telN','<=',digits.replace('+','')+'').limit(25).get());
@@ -810,7 +831,7 @@ async function searchPatients(){const L=$('#patList');if(!L)return;if(!S.db){L.i
    res.sort((a,b)=>patName(a).localeCompare(patName(b),'fr'))}}
  catch(e){console.warn(e);L.innerHTML='<div class="empty"><strong>Recherche impossible</strong>Vérifiez la connexion et réessayez.</div>';return}
  if(norm(S.patQ)!==q||!$('#patList'))return;
- L.innerHTML=res.length?(q?'':'<div class="small muted" style="padding:12px 2px 2px">Dossiers modifiés récemment</div>')+res.map(p=>`<div class="li" style="cursor:pointer" data-act="openPat" data-id="${esc(p.id)}"><div class="avatar">${esc(initials(p))}</div><div class="grow"><div class="t">${esc(patName(p))}</div><div class="s">${esc([ageOf(p.naissance),p.tel].filter(Boolean).join(', ')||'Aucune coordonnée')}</div></div>${p.allergies?'<span class="pill bad">Allergie</span>':''}</div>`).join('')
+ L.innerHTML=res.length?res.map(patRow).join('')
   :`<div class="empty"><strong>${q?'Aucun patient trouvé':'Aucun dossier patient'}</strong>${perm('pat_edit')?'Créez la fiche avec le bouton « Patient ».':q?'Vérifiez l\'orthographe ou cherchez par téléphone.':''}</div>`}
 function openPatient(id){closePatient();S.histAll=false;S.rdvAll=false;S.patient=id;S.patDoc=null;S.patDocs=[];S.patRdv=[];S.patFilter='tout';
  if(S.db){S.subs.pat=S.db.doc('patients/'+id).onSnapshot(s=>{S.patDoc=s.exists?{id,...s.data()}:false;refresh('patients')},e=>console.warn(e));
@@ -1418,7 +1439,7 @@ const Acts={
  labAddPhoto:a=>{if(!S.assets){toast('L\'ajout de photos demande un accès Éditeur à la page.','err');return}S.labUpId=a.dataset.id;$('#labfile').click()},
  labZoom:async a=>{const src=await blobReady(a.dataset.a);const w=window.open?null:null;const d=$('#ask');d.innerHTML=`<div class="dlg-in"><div class="dlg-b"><img src="${esc(src)}" alt="Photo du travail" style="width:100%;border-radius:12px"></div><footer><span class="sp"></span><button class="btn pri" id="askn">Fermer</button></footer></div>`;$('#askn').onclick=()=>d.close();d.onclose=null;d.showModal()},
  labShare:a=>labShare(a.dataset.id),memRefuse:async a=>{const u=a.dataset.u;if(await ask('Refuser l\'accès de '+nameOf(u)+' ?','Refuser'))setMember(u,{statut:'refuse',le:Date.now()},'Demande refusée')},
- openPat:a=>openPatient(a.dataset.id),closePat:()=>{closePatient();go('patients')},patNew:()=>patModal(),patEdit:()=>patModal(S.patDoc),
+ openPat:a=>openPatient(a.dataset.id),patMode:a=>{S.patMode=a.dataset.m;S.patLetter='';searchPatients()},patLetter:a=>{S.patLetter=a.dataset.l;searchPatients()},patMore:a=>{a.disabled=true;a.textContent='Chargement…';loadPatPage(true)},closePat:()=>{closePatient();go('patients')},patNew:()=>patModal(),patEdit:()=>patModal(S.patDoc),
  patRdv:()=>{const p=S.patDoc;rdvModal({date:today(),heure:'',duree:30,statut:'prevu',patient:patName(p),patientId:p.id,tel:p.tel||''})},
  patLab:()=>{const p=S.patDoc;openModal({title:'Travail de laboratoire',ok:null,cancel:'Annuler',body:`<div class="sheet-list">${Object.entries(LAB).map(([k,v])=>`<button type="button" class="nav-item" data-act="patLabPick" data-t="${k}">${ic(v.ic)}<span>${esc(v.nom)}</span></button>`).join('')}</div>`})},
  patLabPick:a=>{$('#dlg').close();const p=S.patDoc;S.labTab=a.dataset.t;labModal({section:a.dataset.t,statut:LAB[a.dataset.t].steps[0][0],patient:patName(p),patientId:p.id,envoiLe:a.dataset.t==='externe'?today():''})},
