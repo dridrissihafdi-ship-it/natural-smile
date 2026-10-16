@@ -194,6 +194,11 @@ td.r,th.r{text-align:right}
 .rdv .h{font-family:var(--f-display);font-weight:600;font-size:1rem}
 .rdv .h small{display:block;color:var(--muted);font-size:.74rem;font-family:var(--f-body);font-weight:400}
 .rdv .grow{min-width:0;cursor:pointer}
+.rdv{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;transition:background .2s}.rdv.pressing{background:var(--accent-soft);border-radius:12px}
+.alprog{display:flex;flex-direction:column;gap:6px;margin:8px 0 2px}.alprog .bar{height:6px;border-radius:9px;background:var(--line);overflow:hidden}.alprog .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold-1),var(--gold-2))}
+.menu-list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.menu-it{display:flex;align-items:center;gap:12px;padding:14px;border:0;border-bottom:1px solid var(--line);background:var(--surface);font:inherit;font-weight:600;color:var(--fg);cursor:pointer;text-align:left}
+.menu-it:last-child{border-bottom:0}.menu-it span{flex:1}.menu-it svg{width:20px;height:20px;color:var(--gold-2)}.menu-it svg:last-child{color:var(--muted);width:16px}.menu-it:hover{background:var(--accent-soft)}
 .rdv.dim{opacity:.55}
 .sel-pill{border:1px solid var(--line);border-radius:999px;padding:5px 9px;font-size:.8rem;background:var(--surface);max-width:150px}
 
@@ -622,10 +627,18 @@ document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g
 /* ---------- pointage helpers ---------- */
 function ptState(p){const s=p?.sessions||[];const last=s[s.length-1];return {sessions:s,inside:!!(last&&!last.out),first:s[0]?.in,last,
  total:s.reduce((t,x)=>t+((x.out||Date.now())-x.in),0)}}
+function getPos(){return new Promise((res,rej)=>{if(!navigator.geolocation){rej(new Error('nogeo'));return}navigator.geolocation.getCurrentPosition(p=>res(p.coords),e=>rej(e),{enableHighAccuracy:true,timeout:20000,maximumAge:0})})}
+function distM(a,b){const R=6371000,r=x=>x*Math.PI/180;const dl=r(b.lat-a.lat),dg=r(b.lng-a.lng);const h=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dg/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+const geoErr=e=>e?.code===1?'Localisation refusée. Autorisez la position pour cette application dans les réglages du téléphone (Confidentialité > Service de localisation).':e?.code===3?'Position introuvable (délai dépassé). Réessayez près d\'une fenêtre ou activez le Wi-Fi.':'Position indisponible sur cet appareil.';
 async function pointer(){
  if(!S.uid){toast('Votre identité n\'est pas disponible : ouvrez la page connecté à votre compte.','err');return}
+ const cab=S.cfg.cabinet;let loc=null;
+ if(cab?.lat!=null&&!S.isOwner){toast('Vérification de votre position…');let c;try{c=await getPos()}catch(e){toast(geoErr(e),'err');return}
+  const d=Math.round(distM(cab,{lat:c.latitude,lng:c.longitude})),acc=Math.round(c.accuracy||0),R=Number(cab.rayon)||150;
+  if(d-Math.min(acc,100)>R){toast(`Pointage impossible : vous êtes à ${d>=1000?(d/1000).toFixed(1)+' km':d+' m'} du cabinet. Le pointage se fait uniquement au cabinet.`,'err');return}
+  loc={d,acc}}
  const st=ptState(S.myPointage);const sess=st.sessions.map(x=>({...x}));let msg;
- if(st.inside){sess[sess.length-1].out=Date.now();msg='Départ enregistré à '+nowHM()}else{sess.push({in:Date.now(),out:null});msg='Arrivée enregistrée à '+nowHM()}
+ if(st.inside){const l=sess[sess.length-1];l.out=Date.now();if(loc)l.outLoc=loc;msg='Départ enregistré à '+nowHM()}else{sess.push({in:Date.now(),out:null,...(loc?{inLoc:loc}:{})});msg='Arrivée enregistrée à '+nowHM()}
  await W(()=>S.db.doc(`pointage/${S.uid}/j/${today()}`).set({date:today(),mois:today().slice(0,7),sessions:sess}),msg);
 }
 
@@ -673,6 +686,9 @@ Views.accueil={update(el){
     <div class="card-h"><h3>Ouverture et fermeture</h3></div>
     <div class="list">${['ouverture','fermeture'].map(id=>{const t=templates().find(x=>x.id===id);const d=doneTpl(id);if(!t)return '';return `<div class="li"><div class="grow"><div class="t">${esc(t.nom)}</div><div class="s">${d?`Faite par ${esc(nameOf(d.by))} à ${hm(d.fin)}`:'À faire aujourd\'hui'}</div></div>${d?'<span class="pill ok">Faite</span>':`<button class="btn pri" data-act="startTpl" data-id="${id}">Commencer</button>`}</div>`}).join('')}</div>
    </section>`:''}
+   ${perm('labo_voir')&&S.labo.some(alDueSoon)?(()=>{const L=S.labo.filter(alDueSoon).sort((a,b)=>a.alProchain<b.alProchain?-1:1);return `<section class="card">
+    <div class="card-h"><h3>Aligneurs à remettre</h3><span class="sp"></span><button class="btn ghost" data-act="alVoir">Voir</button></div>
+    <div class="list">${L.slice(0,6).map(c=>`<div class="li" style="cursor:pointer" data-act="labOpen" data-id="${esc(c.id)}"><div class="grow"><div class="t">${esc(c.patient||'Patient')}</div><div class="s">Aligneur ${(Number(c.alActuel)||0)+1} sur ${esc(c.nb)}</div></div>${alPill(c).replace(/Aligneur \d+ : /,'')}</div>`).join('')}</div></section>`})():''}
    ${perm('mod_stock')?`<section class="card">
     <div class="card-h"><h3>Stock</h3><span class="sp"></span>${low.length?`<button class="btn ghost" data-act="stockLow">Voir</button>`:''}</div>
     <div class="small ${low.length?'':'muted'}">${low.length?`<span class="pill bad">${low.length} article${low.length>1?'s':''} à commander</span><div class="muted" style="margin-top:8px">${low.slice(0,6).map(i=>esc(i.nom)).join(', ')}${low.length>6?'…':''}</div>`:S.stock.length?'Tous les articles sont au-dessus de leur seuil.':'Aucun article enregistré pour le moment.'}</div>
@@ -702,13 +718,38 @@ Views.agenda={
   $('#agDays').innerHTML=Array.from({length:7},(_,i)=>{const x=addDays(mon,i);const o=new Date(x+'T12:00:00');
    return `<button class="day ${x===today()?'today':''}" aria-pressed="${x===d}" data-act="agPick" data-d="${x}">${o.toLocaleDateString('fr-FR',{weekday:'short'}).replace('.','')}<b>${o.getDate()}</b></button>`}).join('');
   const list=[...S.rdvSel].sort((a,b)=>(a.heure||'').localeCompare(b.heure||''));
-  $('#agList').innerHTML=list.length?list.map(r=>`<div class="rdv ${['annule','absent'].includes(r.statut)?'dim':''}">
+  $('#agList').innerHTML=list.length?list.map(r=>`<div data-lp="${esc(r.id)}" class="rdv ${['annule','absent'].includes(r.statut)?'dim':''}">
     <div class="h">${esc(r.heure||'--:--')}<small>${esc(r.duree||30)} min</small></div>
-    <div class="grow" data-act="rdvEdit" data-id="${esc(r.id)}"><div style="font-weight:600">${esc(r.patient||'Patient')}</div><div class="small muted">${esc([r.acte,r.praticien,r.tel].filter(Boolean).join(' · '))}</div>${r.note?`<div class="small muted">${esc(r.note)}</div>`:''}</div>
+    <div class="grow" data-act="rdvEdit" data-id="${esc(r.id)}"><div style="font-weight:600">${esc(r.patient||'Patient')}</div><div class="small muted">${esc([r.acte,r.praticien,r.tel].filter(Boolean).join(' · '))}</div>${r.soins?.texte?`<div class="small"><b>Soins :</b> ${esc(r.soins.texte)}</div>`:''}${r.note?`<div class="small muted">${esc(r.note)}</div>`:''}</div>
     <div class="rdv-side">${r.patientId&&perm('pat_voir')?`<button class="ib" data-act="openPat" data-id="${esc(r.patientId)}" aria-label="Ouvrir la fiche patient" title="Fiche patient">${ic('folder')}</button>`:''}<select class="sel-pill" aria-label="Statut" data-rdvstat="${esc(r.id)}" ${perm('rdv_gerer')?'':'disabled'}>${Object.entries(STATUTS).map(([k,v])=>`<option value="${k}" ${r.statut===k?'selected':''}>${esc(v)}</option>`).join('')}</select></div>
    </div>`).join(''):`<div class="empty"><strong>Aucun rendez-vous ce jour</strong>${perm('rdv_gerer')?'Ajoutez le premier avec le bouton « Rendez-vous ».':''}</div>`;
   $$('[data-rdvstat]').forEach(s=>s.onchange=()=>W(()=>S.db.doc('rdv/'+s.dataset.rdvstat).update({statut:s.value,maj:Date.now(),par:S.uid}),'Statut : '+STATUTS[s.value]));
  }};
+/* Appui long sur un rendez-vous : actions rapides */
+(function(){let t=null,x0=0,y0=0,fired=false;const L=()=>$('#agList');
+ document.addEventListener('pointerdown',e=>{const row=e.target.closest('#agList [data-lp]');if(!row||e.target.closest('select,button'))return;fired=false;x0=e.clientX;y0=e.clientY;clearTimeout(t);
+  row.classList.add('pressing');t=setTimeout(()=>{fired=true;row.classList.remove('pressing');try{navigator.vibrate?.(30)}catch(_){}rdvMenu(row.dataset.lp)},550)},{passive:true});
+ const cancel=()=>{clearTimeout(t);$$('#agList .pressing').forEach(r=>r.classList.remove('pressing'))};
+ document.addEventListener('pointermove',e=>{if(Math.abs(e.clientX-x0)>10||Math.abs(e.clientY-y0)>10)cancel()},{passive:true});
+ ['pointerup','pointercancel','scroll'].forEach(ev=>document.addEventListener(ev,cancel,{passive:true,capture:true}));
+ document.addEventListener('click',e=>{if(fired&&e.target.closest('#agList [data-lp]')){e.stopPropagation();e.preventDefault();fired=false}},true);
+ document.addEventListener('contextmenu',e=>{const row=e.target.closest('#agList [data-lp]');if(row){e.preventDefault();if(!fired)rdvMenu(row.dataset.lp)}});})();
+async function rdvPatientId(r){if(r.patientId)return r.patientId;if(!perm('pat_edit')){toast('Ce rendez-vous n\'est lié à aucune fiche patient.','err');return null}
+ try{const pt=await findOrCreatePatient({full:r.patient,tel:r.tel});if(!pt)return null;if(perm('rdv_gerer'))await S.db.doc('rdv/'+r.id).update({patientId:pt.id,patient:pt.nom||r.patient});r.patientId=pt.id;return pt.id}catch(e){console.warn(e);toast(errMsg(e),'err');return null}}
+function rdvMenu(id){const r=S.rdvSel.find(x=>x.id===id);if(!r)return;const docs=perm('pat_docs')&&!!S.assets,g=perm('rdv_gerer');
+ const items=[docs&&['photo','img','Ajouter des photos'],docs&&['radio','tooth','Ajouter une radio'],g&&['soins','check','Soins de la séance'],g&&['note','edit','Écrire une note'],r.patientId&&perm('pat_voir')&&['fiche','folder','Ouvrir la fiche patient'],['rdv','cal','Modifier le rendez-vous']].filter(Boolean);
+ const d=openModal({title:r.patient||'Patient',ok:null,cancel:'Fermer',body:`<div class="small muted" style="margin-top:-6px">${esc([r.heure,r.acte].filter(Boolean).join(' · '))}</div><div class="menu-list">${items.map(([k,i,l])=>`<button type="button" class="menu-it" data-k="${k}">${ic(i)}<span>${esc(l)}</span>${ic('right')}</button>`).join('')}</div>`});
+ d.querySelector('.menu-list').onclick=async e=>{const b=e.target.closest('[data-k]');if(!b)return;const k=b.dataset.k;
+  if(k==='photo'||k==='radio'){const pid=await rdvPatientId(r);if(!pid)return;d.close();S.upPid=pid;S.upType=k;const i=$('#patfile');i.accept='image/*';i.multiple=k==='photo';i.click()}
+  else if(k==='soins'){d.close();rdvSoins(r)}else if(k==='note'){d.close();rdvNote(r)}else if(k==='fiche'){d.close();openPatient(r.patientId)}else if(k==='rdv'){d.close();rdvModal(r)}}}
+function rdvSoins(r){const so=r.soins||{};openModal({title:'Soins de la séance',body:`<div class="small muted">${esc(r.patient||'')}, ${esc(fmtDate(r.date,{weekday:'long',day:'numeric',month:'long'}))}</div>
+  <label class="f">Soins réalisés<textarea class="inp" name="texte" id="so-t" rows="4" placeholder="Ex. : Traitement endodontique 36, obturation canalaire" required>${esc(so.texte||'')}</textarea></label>
+  <div class="fgrid"><label class="f">Dent(s)<input class="inp" name="dents" id="so-d" value="${esc(so.dents||'')}" placeholder="36"></label><label class="f">Prochaine étape<input class="inp" name="suite" id="so-s" value="${esc(so.suite||'')}" placeholder="Couronne, contrôle…"></label></div>
+  <label class="row small" style="gap:8px"><input type="checkbox" name="fini" ${r.statut==='termine'||!so.texte?'checked':''}> Marquer le rendez-vous comme terminé</label>`,
+ onOk:async f=>{if(!f.texte.trim()){toast('Décrivez les soins réalisés.','err');return false}const data={soins:{texte:f.texte.trim(),dents:f.dents.trim(),suite:f.suite.trim(),by:S.uid,ts:Date.now()},maj:Date.now(),par:S.uid};if(f.fini)data.statut='termine';
+  return W(()=>S.db.doc('rdv/'+r.id).update(data),'Soins enregistrés')}})}
+function rdvNote(r){openModal({title:'Note',body:`<div class="small muted">${esc(r.patient||'')}</div><label class="f">Note du rendez-vous<textarea class="inp" name="note" id="nt-t" rows="4">${esc(r.note||'')}</textarea></label>`,
+ onOk:f=>W(()=>S.db.doc('rdv/'+r.id).update({note:f.note.trim(),maj:Date.now(),par:S.uid}),'Note enregistrée')})}
 function subRdvSel(){S.subs.rdvSel?.();S.rdvSel=[];if(!S.db||!S.uid||!perm('rdv_voir'))return;
  S.subs.rdvSel=S.db.collection('rdv').where('date','==',S.agDate).onSnapshot(s=>{S.rdvSel=s.docs.map(d=>({id:d.id,...d.data()}));refresh('agenda')},e=>console.warn(e))}
 function rdvModal(r){r=r||{date:S.agDate,heure:'',duree:30,statut:'prevu'};const ro=!perm('rdv_gerer');S.patPick={};
@@ -980,7 +1021,7 @@ function updatePatient(){const p=S.patDoc;const H=$('#patHead'),B=$('#patBody');
  </section>
  ${perm('labo_voir')&&S.labo.some(c=>c.patientId===p.id)?`<section class="card"><div class="card-h"><h3>Laboratoire</h3></div><div class="list">${S.labo.filter(c=>c.patientId===p.id).map(c=>`<div class="li" style="cursor:pointer" data-act="labOpen" data-id="${esc(c.id)}"><div class="grow"><div class="t">${esc(c.travail||'Travail')}${c.dents?', dent '+esc(c.dents):''}</div><div class="s">${esc(LAB[c.section]?.nom||'')}, ${esc(LAB[c.section]?.steps[labStepIdx(c)]?.[1]||'')}</div></div>${labDue(c)}</div>`).join('')}</div></section>`:''}
  ${finHTML()}${histHTML()}
- <section class="card"><div class="card-h"><h3>Rendez-vous</h3><span class="sp"></span>${rdvs.length?`<span class="small muted">${rdvs.length}</span>`:''}</div>${rdvs.length?`<div class="list">${(S.rdvAll?rdvs:rdvs.slice(0,15)).map(r=>`<div class="li" style="cursor:pointer" data-act="patRdvOpen" data-id="${esc(r.id)}"><div class="grow"><div class="t">${esc(capFirst(fmtDate(r.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})))}, ${esc(r.heure||'')}</div><div class="s">${esc(r.acte||'')}</div></div><span class="pill ${STATUT_CLS[r.statut]||''}">${esc(STATUTS[r.statut]||'Prévu')}</span></div>`).join('')}</div>${rdvs.length>15&&!S.rdvAll?`<button class="btn ghost" data-act="rdvAll" style="margin-top:8px">Afficher les ${rdvs.length} rendez-vous</button>`:''}`:'<div class="small muted">Aucun rendez-vous lié à ce dossier.</div>'}</section>`}
+ <section class="card"><div class="card-h"><h3>Rendez-vous</h3><span class="sp"></span>${rdvs.length?`<span class="small muted">${rdvs.length}</span>`:''}</div>${rdvs.length?`<div class="list">${(S.rdvAll?rdvs:rdvs.slice(0,15)).map(r=>`<div class="li" style="cursor:pointer" data-act="patRdvOpen" data-id="${esc(r.id)}"><div class="grow"><div class="t">${esc(capFirst(fmtDate(r.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})))}, ${esc(r.heure||'')}</div><div class="s">${esc(r.acte||'')}</div>${r.soins?.texte?`<div class="s" style="color:var(--fg)"><b>Soins :</b> ${esc(r.soins.texte)}${r.soins.dents?' (dent '+esc(r.soins.dents)+')':''}</div>`:''}${r.note?`<div class="s">Note : ${esc(r.note)}</div>`:''}</div><span class="pill ${STATUT_CLS[r.statut]||''}">${esc(STATUTS[r.statut]||'Prévu')}</span></div>`).join('')}</div>${rdvs.length>15&&!S.rdvAll?`<button class="btn ghost" data-act="rdvAll" style="margin-top:8px">Afficher les ${rdvs.length} rendez-vous</button>`:''}`:'<div class="small muted">Aucun rendez-vous lié à ce dossier.</div>'}</section>`}
 function patModal(p){p=p||{};
  openModal({title:p.id?'Modifier la fiche':'Nouveau patient',del:p.id&&perm('pat_suppr')?'Supprimer le dossier':null,
  body:`<div class="fgrid"><label class="f">Nom<input class="inp" name="nom" id="pt-nom" required value="${esc(p.nom||'')}" autocomplete="off"></label><label class="f">Prénom<input class="inp" name="prenom" id="pt-prenom" value="${esc(p.prenom||'')}" autocomplete="off"></label></div>
@@ -1000,7 +1041,7 @@ function patModal(p){p=p||{};
  onDel:async()=>{if(!await ask(`Supprimer définitivement le dossier de ${patName(p)}, avec ses radios et photos ?`,'Supprimer'))return false;
   try{const s=await S.db.collection(`patients/${p.id}/docs`).get();for(const d of s.docs){const x=d.data();if(x.asset&&S.assets){try{await S.assets.delete(x.asset)}catch(e){}}await S.db.doc(`patients/${p.id}/docs/${d.id}`).delete()}
    await S.db.doc('patients/'+p.id).delete();toast('Dossier supprimé');closePatient();go('patients');return true}catch(e){toast(errMsg(e),'err');return false}}})}
-$('#patfile').addEventListener('change',e=>{const files=[...e.target.files];e.target.value='';if(!files.length||!S.patient)return;const t=S.upType||'radio';
+$('#patfile').addEventListener('change',e=>{const files=[...e.target.files];e.target.value='';const pidX=S.upPid||S.patient;S.upPid=null;if(!files.length||!pidX)return;const t=S.upType||'radio';
  const thumbs=files.filter(f=>f.type.startsWith('image/')).slice(0,8).map(f=>URL.createObjectURL(f));
  openModal({title:`Ajouter ${files.length>1?files.length+' fichiers':DTYPES[t].toLowerCase()}`,ok:'Ajouter au dossier',
  body:`${thumbs.length?`<div class="previews">${thumbs.map(u=>`<img src="${u}" alt="">`).join('')}</div>`:''}
@@ -1009,7 +1050,7 @@ $('#patfile').addEventListener('change',e=>{const files=[...e.target.files];e.ta
  <div class="fgrid"><label class="f">Titre<input class="inp" name="titre" id="up-titre" list="dl-titres" placeholder="${t==='radio'?'Panoramique, rétro-alvéolaire…':t==='photo'?'Photo initiale, sourire…':'Compte rendu, ordonnance…'}"></label>
  <label class="f">Dent(s)<input class="inp" name="dents" id="up-dents" placeholder="36, 37" inputmode="numeric"></label></div>
  <datalist id="dl-titres">${['Panoramique','Rétro-alvéolaire','Bite-wing','CBCT (capture)','Contrôle post-opératoire','Photo initiale','Photo de fin de traitement','Photo sourire','Photo intrabuccale'].map(x=>`<option value="${x}">`).join('')}</datalist>`,
- onOk:async f=>{let n=0;const pid=S.patient;
+ onOk:async f=>{let n=0;const pid=pidX;
   for(const file of files){n++;toast(`Envoi ${n} sur ${files.length}…`);try{let up,mime;
    if(file.type==='application/pdf'){up=await S.assets.upload(file,{type:'application/pdf'});mime='application/pdf'}
    else{const blob=await compressImg(file,f.type==='radio'?2600:2000,f.type==='radio'?.92:.86);up=await S.assets.upload(blob,{type:'image/jpeg'});mime='image/jpeg'}
@@ -1196,28 +1237,30 @@ function stockMount(el,embedded){const lab=S.stockZone==='labo';
   ${canStock()?`<div class="row" style="gap:8px"><button class="btn pri big" style="flex:1" data-act="scanIn">${ic('scan')}Scanner une entrée</button><button class="btn ghost big" style="flex:1" data-act="scanOut">${ic('scan')}Scanner une sortie</button></div>`:''}
   <div class="chips" id="stChips"></div><div class="card" style="padding-block:4px" id="stList"></div></div>${canStock()?`<button class="btn pri big fab" data-act="stockEdit" data-id="">${ic('plus')}Article</button>`:''}`;
  $('#stq').addEventListener('input',e=>{S.stockQ=e.target.value;stockUpdate()})}
-function stockRow(i,can){const qte=qtyOf(i);const lo=isLow(i);return `<div class="stk ${lo?'low':''}"><div class="grow" data-act="stockEdit" data-id="${esc(i.id)}"><div style="font-weight:600">${esc(i.nom)} ${lo?'<span class="pill bad">À commander</span>':''}${perPill(i)}</div>
+function stockRow(i,can){const qte=qtyOf(i);const lo=isLow(i);return `<div class="stk ${lo||qte<=2?'low':''}"><div class="grow" data-act="stockEdit" data-id="${esc(i.id)}"><div style="font-weight:600">${esc(i.nom)} ${lo?'<span class="pill bad">À commander</span>':''}${perPill(i)}</div>
    <div class="small muted">${esc([S.stockFilter===stockCat(i)?'':stockCat(i),i.lieu,i.fournisseur].filter(Boolean).join(', '))}${Number(i.seuil)?`, seuil ${esc(i.seuil)}`:''}</div></div>
    <div class="qty">${can?`<button class="ib" data-act="qty" data-id="${esc(i.id)}" data-n="-1" aria-label="Retirer une unité">${ic('minus')}</button>`:''}<b>${qte}</b>${can?`<button class="ib" data-act="qty" data-id="${esc(i.id)}" data-n="1" aria-label="Ajouter une unité">${ic('plus')}</button>`:''}<span class="small muted" style="min-width:3ch">${esc(i.unite||'')}</span></div></div>`}
+const isPeu=i=>qtyOf(i)<=2;
 const perPill=i=>{if(!i.peremption||qtyOf(i)<=0)return '';const t=today();const soon=new Date(Date.now()+60*864e5).toISOString().slice(0,10);return i.peremption<t?' <span class="pill bad">Périmé</span>':i.peremption<=soon?` <span class="pill warn">Pér. ${esc(fmtDate(i.peremption,{day:'numeric',month:'short'}))}</span>`:''};
 const secIni=n=>n.replace(/&/g,'').split(/[\s-]+/).filter(w=>w.length>2||/^[A-Z]/.test(w)).slice(0,2).map(w=>w[0].toUpperCase()).join('');
 function stockUpdate(){const L=$('#stList');if(!L)return;const Z=zoneItems();const low=Z.filter(isLow).length;const lab=S.stockZone==='labo';const CATS=lab?LAB_CATS:STOCK_CATS;
   const cats=[...new Set(Z.map(stockCat))].sort((a,b)=>(CATS.indexOf(a)+1||99)-(CATS.indexOf(b)+1||99));const allCats=lab?cats:[...CATS,...cats.filter(c=>!CATS.includes(c))];
-  if(S.stockFilter!=='tous'&&S.stockFilter!=='bas'&&!allCats.includes(S.stockFilter))S.stockFilter='tous';
+  if(!['tous','bas','peu'].includes(S.stockFilter)&&!allCats.includes(S.stockFilter))S.stockFilter='tous';
   const q=S.stockQ.trim().toLowerCase();const can=canStock();const F=S.stockFilter;
-  const chips=lab?[['tous','Tout ('+Z.length+')'],['bas','À commander ('+low+')'],...cats.map(c=>[c,c])]:[['tous','Sections ('+Z.length+' articles)'],['bas','À commander ('+low+')'],...(F!=='tous'&&F!=='bas'?[[F,F]]:[])];
+  const peu=Z.filter(isPeu);
+  const chips=lab?[['tous','Tout ('+Z.length+')'],['peu','2 pièces ou moins ('+peu.length+')'],['bas','À commander ('+low+')'],...cats.map(c=>[c,c])]:[['tous','Sections ('+Z.length+' articles)'],['peu','2 pièces ou moins ('+peu.length+')'],['bas','À commander ('+low+')'],...(!['tous','bas','peu'].includes(F)?[[F,F]]:[])];
   $('#stChips').innerHTML=chips.map(([k,v])=>`<button class="chip" aria-pressed="${F===k}" data-act="stFilter" data-k="${esc(k)}">${esc(v)}</button>`).join('');
   const sort=a=>a.sort((x,y)=>(isLow(y)-isLow(x))||(x.nom||'').localeCompare(y.nom||'','fr'));
   if(!lab&&!q&&F==='tous'){L.classList.add('plain');
-   L.innerHTML=`<div class="secgrid">${allCats.map(c=>{const it=Z.filter(i=>stockCat(i)===c);const lo=it.filter(isLow).length;const sec=stockSec(c);
+   const pz=sort(peu.slice());L.innerHTML=(pz.length?`<section class="card stack" style="gap:4px;margin-bottom:12px;border-color:var(--bad)"><div class="row"><h3 style="color:var(--bad)">Il reste 2 pièces ou moins</h3><span class="sp"></span><button class="btn ghost" data-act="stFilter" data-k="peu">Tout voir (${pz.length})</button></div>${pz.slice(0,8).map(i=>stockRow(i,can)).join('')}</section>`:'')+`<div class="secgrid">${allCats.map(c=>{const it=Z.filter(i=>stockCat(i)===c);const lo=it.filter(isLow).length;const sec=stockSec(c);
     return `<button class="sec" data-act="stFilter" data-k="${esc(c)}"><span class="ini">${esc(secIni(c))}</span><span style="min-width:0"><div class="n">${esc(c)}</div>${sec?`<div class="d">${esc(sec.d)}</div>`:''}</span><span class="c">${it.length?it.length+' article'+(it.length>1?'s':''):'Vide'}${lo?`<br><span class="pill bad">${lo} à commander</span>`:''}</span></button>`}).join('')}</div>`;return}
   L.classList.remove('plain');
-  const items=sort(Z.filter(i=>(F==='tous'||(F==='bas'?isLow(i):stockCat(i)===F))&&(!q||[i.nom,i.fournisseur,i.lieu,stockCat(i)].join(' ').toLowerCase().includes(q))));
-  const isSec=!lab&&F!=='tous'&&F!=='bas';const sec=isSec&&stockSec(F);
+  const items=sort(Z.filter(i=>(F==='tous'||(F==='bas'?isLow(i):F==='peu'?isPeu(i):stockCat(i)===F))&&(!q||[i.nom,i.fournisseur,i.lieu,stockCat(i)].join(' ').toLowerCase().includes(q))));
+  const isSec=!lab&&!['tous','bas','peu'].includes(F);const sec=isSec&&stockSec(F);
   const head=isSec?`<div class="row" style="padding:10px 2px 6px;gap:8px;flex-wrap:wrap"><button class="btn ghost" data-act="stFilter" data-k="tous">${ic('left')}Sections</button><span class="sp"></span>${can?`${sec?`<button class="btn ghost" data-act="stockCatalog" data-k="${esc(F)}">${ic('plus')}Ajouter depuis le catalogue</button>`:''}<button class="btn ghost" data-act="stockEdit" data-id="">${ic('plus')}Article</button>`:''}</div><h3 style="margin:2px 2px 6px">${esc(F)}</h3>`:'';
   L.innerHTML=head+(items.length?items.map(i=>stockRow(i,can)).join('')
    :isSec?`<div class="empty"><strong>Aucun article dans cette section</strong>${can&&sec?'Utilisez « Ajouter depuis le catalogue » pour cocher les articles que vous utilisez, puis indiquez les quantités et les seuils.':''}</div>`
-   :Z.length?`<div class="empty"><strong>Aucun article trouvé</strong>Modifiez la recherche ou le filtre.</div>`:`<div class="empty"><strong>Le stock ${lab?'du laboratoire':''} est vide</strong>${can?`Ajoutez ${lab?'vos disques de zircone, résines, cires et feuilles de thermoformage':'vos consommables, matériaux et instruments'} avec le bouton « Article ». Indiquez un seuil pour être alerté avant la rupture.`:''}</div>`)}
+   :F==='peu'&&Z.length?`<div class="empty"><strong>Aucun article à 2 pièces ou moins</strong></div>`:Z.length?`<div class="empty"><strong>Aucun article trouvé</strong>Modifiez la recherche ou le filtre.</div>`:`<div class="empty"><strong>Le stock ${lab?'du laboratoire':''} est vide</strong>${can?`Ajoutez ${lab?'vos disques de zircone, résines, cires et feuilles de thermoformage':'vos consommables, matériaux et instruments'} avec le bouton « Article ». Indiquez un seuil pour être alerté avant la rupture.`:''}</div>`)}
 function stockCatalog(sec){const Z=zoneItems();const have=new Set(Z.map(i=>norm(i.nom)));const list=catItems(sec);const free=list.filter(x=>!have.has(norm(x.nom)));
  openModal({title:sec,ok:free.length?'Ajouter la sélection':null,cancel:'Fermer',
   body:`<div class="small muted">Cochez les articles utilisés au cabinet. Ils seront ajoutés avec une quantité de 0 : indiquez ensuite la quantité et le seuil d'alerte de chacun.</div>
@@ -1302,22 +1345,38 @@ Views.labo={
   if(tab==='stock'){stockUpdate();return}
   const L=$('#labList');if(!L)return;const sec=LAB[tab];const f=S.labFilter||'encours';const q=norm(S.labQ);
   const list=all.filter(c=>c.section===tab);
-  const cnt={encours:list.filter(c=>!labDone(c)).length,retard:list.filter(labLate).length,termines:list.filter(labDone).length};
-  $('#labChips').innerHTML=[['encours','En cours'],['retard','En retard'],['termines','Terminés']].map(([k,l])=>`<button class="chip" aria-pressed="${f===k}" data-act="labFilter" data-k="${k}">${l} (${cnt[k]})</button>`).join('');
-  let items=list.filter(c=>f==='encours'?!labDone(c):f==='retard'?labLate(c):labDone(c)).filter(c=>!q||norm([c.patient,c.travail,c.teinte,c.dents,c.materiau,c.laboExt,c.praticien].join(' ')).includes(q));
-  items.sort((a,b)=>f==='termines'?(b.maj||0)-(a.maj||0):((a.echeance||'9999')<(b.echeance||'9999')?-1:(a.echeance||'9999')>(b.echeance||'9999')?1:(b.maj||0)-(a.maj||0)));
+  const cnt={encours:list.filter(c=>!labDone(c)).length,retard:list.filter(labLate).length,termines:list.filter(labDone).length,suivi:list.filter(alEnCours).length,remettre:list.filter(alDueSoon).length};
+  $('#labChips').innerHTML=[['encours','En cours'],['retard','En retard'],...(tab==='aligneurs'?[['suivi','Traitements en cours'],['remettre','À remettre']]:[]),['termines','Terminés']].map(([k,l])=>`<button class="chip" aria-pressed="${f===k}" data-act="labFilter" data-k="${k}">${l} (${cnt[k]})</button>`).join('');
+  let items=list.filter(c=>f==='encours'?!labDone(c):f==='retard'?labLate(c):f==='suivi'?alEnCours(c):f==='remettre'?alDueSoon(c):labDone(c)).filter(c=>!q||norm([c.patient,c.travail,c.teinte,c.dents,c.materiau,c.laboExt,c.praticien].join(' ')).includes(q));
+  items.sort((a,b)=>(f==='suivi'||f==='remettre')?((a.alProchain||'9999')<(b.alProchain||'9999')?-1:1):f==='termines'?(b.maj||0)-(a.maj||0):((a.echeance||'9999')<(b.echeance||'9999')?-1:(a.echeance||'9999')>(b.echeance||'9999')?1:(b.maj||0)-(a.maj||0)));
   const can=perm('labo_gerer');
   L.innerHTML=items.length?items.map(c=>{const i=labStepIdx(c);const st=sec.steps;const nx=st[i+1];
    return `<article class="case ${labLate(c)?'late':''}"><div class="case-top" data-act="labOpen" data-id="${esc(c.id)}"><div class="grow"><div class="t">${esc(c.patient||'Patient')}</div>
-    <div class="s">${esc([c.travail,c.dents?'dent '+c.dents:'',c.teinte?'teinte '+c.teinte:'',c.materiau,tab==='externe'&&c.laboExt?c.laboExt:''].filter(Boolean).join(', '))}</div></div>${labDue(c)}</div>
+    <div class="s">${esc([c.travail,c.dents?'dent '+c.dents:'',c.teinte?'teinte '+c.teinte:'',c.materiau,tab==='externe'&&c.laboExt?c.laboExt:''].filter(Boolean).join(', '))}</div></div>${alEnCours(c)&&labDone(c)?'<span class="pill ok">Série livrée</span>':labDue(c)}</div>
+    ${alProgress(c)}
     <div class="steps" aria-label="Étape ${i+1} sur ${st.length}">${st.map((x,j)=>`<i class="${j<=i?'on':''}" title="${esc(x[1])}"></i>`).join('')}</div>
-    <div class="case-foot"><span class="small"><b>${esc(st[i][1])}</b>${c.photos?.length?`<span class="muted">, ${c.photos.length} photo${c.photos.length>1?'s':''}</span>`:''}</span><span class="sp"></span>${can&&nx?`<button class="btn ghost" data-act="labNext" data-id="${esc(c.id)}">${esc(nx[1])}${ic('right')}</button>`:''}</div></article>`}).join('')
-   :`<div class="card"><div class="empty"><strong>${f==='encours'?'Aucun travail en cours':f==='retard'?'Aucun retard':'Aucun travail terminé'}</strong>${f==='encours'&&can?`Ajoutez ${tab==='externe'?'un envoi vers un laboratoire extérieur':'un travail'} avec le bouton en bas de l'écran.`:''}</div></div>`}};
+    <div class="case-foot"><span class="small"><b>${esc(st[i][1])}</b>${c.photos?.length?`<span class="muted">, ${c.photos.length} photo${c.photos.length>1?'s':''}</span>`:''}</span><span class="sp"></span>${can&&nx?`<button class="btn ghost" data-act="labNext" data-id="${esc(c.id)}">${esc(nx[1])}${ic('right')}</button>`:''}${can&&!nx&&alEnCours(c)?`<button class="btn pri" data-act="alRemis" data-id="${esc(c.id)}">${ic('check')}Aligneur ${(Number(c.alActuel)||0)+1} remis</button>`:''}</div></article>`}).join('')
+   :`<div class="card"><div class="empty"><strong>${f==='encours'?'Aucun travail en cours':f==='retard'?'Aucun retard':f==='suivi'?'Aucun traitement par aligneurs en cours':f==='remettre'?'Aucun aligneur à remettre dans les 3 jours':'Aucun travail terminé'}</strong>${f==='encours'&&can?`Ajoutez ${tab==='externe'?'un envoi vers un laboratoire extérieur':'un travail'} avec le bouton en bas de l'écran.`:''}</div></div>`}};
 async function labSetStep(c,statut){const steps=LAB[c.section].steps;const hist=[...(c.historique||[]),{s:statut,ts:Date.now(),by:S.uid}].slice(-40);
  return W(()=>S.db.doc('labo/'+c.id).update({statut,historique:hist,maj:Date.now(),par:S.uid}),statut===steps[steps.length-1][0]?'Travail terminé':'Étape : '+steps.find(x=>x[0]===statut)[1])}
-function labPhotosHTML(c){const can=perm('labo_gerer')&&S.assets;
- return `${(c.photos||[]).length?`<div class="gallery">${c.photos.map(a=>`<button type="button" class="thumb" data-act="labZoom" data-a="${esc(a)}"><img src="${esc(blobUrl(a))}" alt="Photo du travail" loading="lazy"></button>`).join('')}</div>`:'<div class="small muted">Aucune photo pour ce travail.</div>'}
- ${can?`<button type="button" class="btn ghost" data-act="labAddPhoto" data-id="${esc(c.id)}" style="align-self:flex-start">${ic('img')}Ajouter des photos ou captures du design</button>`:''}`}
+const LAB_PCATS=[['avant','Photos avant','Situation initiale, teinte, sourire'],['design','Design numérique','Captures CAO, setup, maquette'],['travail','Travail terminé','Prothèse, essayage, résultat']];
+const labPcat=(c,a)=>(c.pcat||{})[a]||'travail';
+function labPhotosHTML(c){const can=perm('labo_gerer')&&S.assets;const P=c.photos||[];
+ return LAB_PCATS.map(([k,l,h])=>{const ps=P.filter(a=>labPcat(c,a)===k);return `<div class="stack" style="gap:8px"><div class="row" style="gap:8px"><b>${esc(l)}</b><span class="small muted">${ps.length||''}</span><span class="sp"></span>${can?`<button type="button" class="btn ghost" data-act="labAddPhoto" data-id="${esc(c.id)}" data-c="${k}">${ic('plus')}Ajouter</button>`:''}</div>
+  ${ps.length?`<div class="gallery">${ps.map(a=>`<button type="button" class="thumb" data-act="labZoom" data-a="${esc(a)}"><img src="${esc(blobUrl(a))}" alt="${esc(l)}" loading="lazy"></button>`).join('')}</div>`:`<div class="small muted">${esc(h)} : aucune photo.</div>`}</div>`}).join('')}
+/* Suivi des aligneurs chez le patient */
+const alTrack=c=>c.section==='aligneurs'&&Number(c.nb)>0;
+const alEnCours=c=>alTrack(c)&&(Number(c.alActuel)||0)<Number(c.nb);
+const alDueSoon=c=>alEnCours(c)&&c.alProchain&&c.alProchain<=addDays(today(),3);
+function alPill(c){if(!alEnCours(c)||!c.alProchain)return alTrack(c)&&!alEnCours(c)?'<span class="pill ok">Traitement terminé</span>':'';const d=c.alProchain,t=today();
+ const lbl=d===t?'aujourd\'hui':d===addDays(t,1)?'demain':fmtDate(d,{weekday:'short',day:'numeric',month:'short'});
+ return `<span class="pill ${d<t?'bad':d<=addDays(t,3)?'warn':''}">Aligneur ${(Number(c.alActuel)||0)+1} : ${d<t?'en retard, ':''}${esc(lbl)}</span>`}
+function alProgress(c){if(!alTrack(c))return '';const n=Number(c.nb),a=Math.min(n,Number(c.alActuel)||0);
+ return `<div class="alprog"><div class="row small" style="gap:6px"><b>Aligneur ${a} / ${n}</b><span class="muted">${a>=n?'série terminée':`, reste ${n-a}`}</span><span class="sp"></span>${alPill(c)}</div><div class="bar"><i style="width:${Math.round(a/n*100)}%"></i></div></div>`}
+async function alRemis(id){const c=S.labo.find(x=>x.id===id);if(!c)return;const a=(Number(c.alActuel)||0)+1,n=Number(c.nb),iv=Number(c.alIntervalle)||14;
+ if(!await ask(`Confirmer la remise de l'aligneur n° ${a} sur ${n} à ${c.patient||'ce patient'} ?`,'Confirmer'))return;
+ const h=[...(c.alHist||[]),{n:a,d:today(),by:S.uid}].slice(-80);
+ await W(()=>S.db.doc('labo/'+id).update({alActuel:a,alRemis:today(),alProchain:a<n?addDays(today(),iv):'',alHist:h,maj:Date.now(),par:S.uid}),a<n?`Aligneur ${a} remis. Prochain le ${fmtDate(addDays(today(),iv),{day:'numeric',month:'long'})}`:'Dernier aligneur remis')}
 function labModal(c){const tab=c?.section||S.labTab||'fixe';const sec=LAB[tab];const ro=!perm('labo_gerer');S.patPick={};
  c=c||{section:tab,statut:sec.steps[0][0],echeance:'',envoiLe:tab==='externe'?today():''};
  const praticiens=teamMembers().filter(u=>['dentiste','stagiaire','prothesiste'].includes(roleOf(u))).map(nameOf);
@@ -1325,13 +1384,18 @@ function labModal(c){const tab=c?.section||S.labTab||'fixe';const sec=LAB[tab];c
  const d=openModal({title:(c.id?(ro?'':'Modifier : '):'Nouveau : ')+sec.nom,ok:ro?null:'Enregistrer',cancel:ro?'Fermer':'Annuler',del:c.id&&!ro?'Supprimer':null,
  body:`<fieldset class="fs" ${ro?'disabled':''}><label class="f">Patient<input class="inp" name="patient" id="lb-pat" value="${esc(c.patient||'')}" autocomplete="off" required></label>
   <div class="fgrid"><label class="f">Travail<input class="inp" name="travail" id="lb-trav" list="dl-trav" value="${esc(c.travail||'')}" required></label><label class="f">${tab==='aligneurs'?'Arcade(s)':'Dent(s)'}<input class="inp" name="dents" id="lb-dents" value="${esc(c.dents||'')}" placeholder="${tab==='aligneurs'?'Maxillaire et mandibule':'14, 15, 16'}"></label></div>
-  <div class="fgrid">${tab!=='aligneurs'?`<label class="f">Teinte<input class="inp" name="teinte" id="lb-teinte" list="dl-teinte" value="${esc(c.teinte||'')}"></label>`:`<label class="f">Nombre d'aligneurs<input class="inp" type="number" min="0" name="nb" id="lb-nb" value="${esc(c.nb||'')}"></label>`}
+  <div class="fgrid">${tab!=='aligneurs'?`<label class="f">Teinte<input class="inp" name="teinte" id="lb-teinte" list="dl-teinte" value="${esc(c.teinte||'')}"></label>`:`<label class="f">Nombre total d'aligneurs prévus<input class="inp" type="number" min="0" name="nb" id="lb-nb" value="${esc(c.nb||'')}"></label>`}
    <label class="f">Matériau<input class="inp" name="materiau" id="lb-mat" list="dl-mat" value="${esc(c.materiau||'')}"></label></div>
   ${tab==='externe'?`<div class="fgrid"><label class="f">Laboratoire<input class="inp" name="laboExt" id="lb-labo" list="dl-labs" value="${esc(c.laboExt||'')}" required></label><label class="f">Date d'envoi<input class="inp" type="date" name="envoiLe" id="lb-envoi" value="${esc(c.envoiLe||'')}"></label></div>`:''}
   <div class="fgrid"><label class="f">Praticien<input class="inp" name="praticien" id="lb-prat" list="dl-lprat" value="${esc(c.praticien||'')}"></label><label class="f">${sec.echeance}<input class="inp" type="date" name="echeance" id="lb-ech" value="${esc(c.echeance||'')}"></label></div>
+  ${tab==='aligneurs'?`<section class="card stack" style="gap:10px;padding:14px"><b>Suivi du traitement</b>
+   <div class="fgrid"><label class="f">Dernier aligneur remis (n°)<input class="inp" type="number" min="0" name="alActuel" id="lb-alact" value="${esc(c.alActuel||0)}"></label><label class="f">Changement tous les (jours)<input class="inp" type="number" min="1" max="60" name="alIntervalle" id="lb-aliv" value="${esc(c.alIntervalle||14)}"></label></div>
+   <label class="f">Remise du prochain aligneur le<input class="inp" type="date" name="alProchain" id="lb-alpro" value="${esc(c.alProchain||'')}"></label>
+   <div class="small muted">Un rappel s'affiche à l'accueil et dans le laboratoire 3 jours avant la date. Utilisez « Aligneur remis » sur la fiche pour avancer automatiquement.</div></section>`:''}
   <label class="f">Étape<select class="inp" name="statut" id="lb-statut">${sec.steps.map(([k,l])=>`<option value="${k}" ${c.statut===k?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
   <label class="f">Notes pour le prothésiste<textarea class="inp" name="notes" id="lb-notes" rows="3" style="min-height:70px" placeholder="Forme, caractérisation, points de contact, espace prothétique…">${esc(c.notes||'')}</textarea></label></fieldset>
-  ${c.id?`<section class="stack" style="gap:10px"><h3>Photos</h3><div class="stack" style="gap:10px" id="labPhotos" data-id="${esc(c.id)}">${labPhotosHTML(c)}</div></section>
+  ${c.id&&alTrack(c)?`<section class="stack" style="gap:8px"><h3>Aligneurs</h3>${alProgress(c)}${alEnCours(c)&&!ro?`<button type="button" class="btn pri" data-act="alRemis" data-id="${esc(c.id)}" style="align-self:flex-start">${ic('check')}Aligneur n° ${(Number(c.alActuel)||0)+1} remis aujourd'hui</button>`:''}${(c.alHist||[]).length?`<div class="small muted">${[...c.alHist].reverse().slice(0,6).map(h=>`n° ${h.n} le ${esc(fmtDate(h.d,{day:'numeric',month:'short'}))}`).join(' · ')}</div>`:''}</section>`:''}
+  ${c.id?`<section class="stack" style="gap:10px"><h3>Photos</h3><div class="stack" style="gap:14px" id="labPhotos" data-id="${esc(c.id)}">${labPhotosHTML(c)}</div></section>
   <section class="stack" style="gap:8px"><h3>Partager</h3><div class="row"><select class="inp" id="lb-grp" style="flex:1;min-width:160px" aria-label="Groupe">${myGroups().map(g=>`<option value="${esc(g.id)}" ${g.id===(c.statut==='validation'?'designs':'prothese')?'selected':''}>${esc(g.nom)}</option>`).join('')}</select><button type="button" class="btn ghost" data-act="labShare" data-id="${esc(c.id)}">${ic('send')}Envoyer au groupe</button></div></section>
   <section class="stack" style="gap:6px"><h3>Historique</h3><div class="list">${[...(c.historique||[])].reverse().map(h=>`<div class="li"><div class="grow"><div class="t small">${esc(sec.steps.find(x=>x[0]===h.s)?.[1]||h.s)}</div><div class="s">${esc(nameOf(h.by))}, ${new Date(h.ts).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})}</div></div></div>`).join('')||'<div class="small muted">Aucun changement enregistré.</div>'}</div></section>`:''}
   <datalist id="dl-trav">${sec.travaux.map(x=>`<option value="${esc(x)}">`).join('')}</datalist><datalist id="dl-mat">${sec.materiaux.map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
@@ -1340,14 +1404,15 @@ function labModal(c){const tab=c?.section||S.labTab||'fixe';const sec=LAB[tab];c
   const pick=S.patPick[f.patient];let patient=f.patient.trim(),patientId=c.patientId||null;if(pick){patient=pick.nom;patientId=pick.id}else if(patient!==(c.patient||''))patientId=null;
   const data={section:tab,patient,patientId,travail:f.travail.trim(),dents:f.dents.trim(),teinte:(f.teinte||'').trim(),nb:f.nb?Number(f.nb):null,materiau:f.materiau.trim(),laboExt:(f.laboExt||'').trim(),envoiLe:f.envoiLe||'',
    praticien:f.praticien.trim(),echeance:f.echeance,statut:f.statut,notes:f.notes.trim(),maj:Date.now(),par:S.uid};
+  if(tab==='aligneurs'){data.alActuel=Math.max(0,Number(f.alActuel)||0);data.alIntervalle=Math.max(1,Number(f.alIntervalle)||14);data.alProchain=f.alProchain||''}
   if(c.id){if(f.statut!==c.statut)data.historique=[...(c.historique||[]),{s:f.statut,ts:Date.now(),by:S.uid}].slice(-40);return W(()=>S.db.doc('labo/'+c.id).update(data),'Travail enregistré')}
   return W(()=>S.db.collection('labo').add({...data,photos:[],historique:[{s:f.statut,ts:Date.now(),by:S.uid}],cree:Date.now(),creePar:S.uid}),'Travail ajouté')},
  onDel:async()=>{if(!await ask('Supprimer ce travail et ses photos ?','Supprimer'))return false;const ok=await W(()=>S.db.doc('labo/'+c.id).delete(),'Travail supprimé');
   if(ok&&S.assets)for(const a of c.photos||[]){try{await S.assets.delete(a)}catch(e){}}return ok}});
  const inp=$('#lb-pat',d);if(!ro&&perm('pat_voir'))patSuggest(inp)}
-$('#labfile').addEventListener('change',async e=>{const files=[...e.target.files];e.target.value='';const id=S.labUpId;const c=S.labo.find(x=>x.id===id);if(!files.length||!c||!S.assets)return;
+$('#labfile').addEventListener('change',async e=>{const files=[...e.target.files];e.target.value='';const id=S.labUpId,cat=S.labCat||'travail';const c=S.labo.find(x=>x.id===id);if(!files.length||!c||!S.assets)return;
  const ids=[];let n=0;for(const file of files){n++;toast(`Envoi ${n} sur ${files.length}…`);try{const blob=await compressImg(file,2000,.86);const up=await S.assets.upload(blob,{type:'image/jpeg'});ids.push(up.id)}catch(err){console.warn(err);toast(errMsg(err),'err');break}}
- if(!ids.length)return;const cur=(S.labo.find(x=>x.id===id)?.photos)||[];await W(()=>S.db.doc('labo/'+id).update({photos:[...cur,...ids],maj:Date.now(),par:S.uid}),ids.length>1?ids.length+' photos ajoutées':'Photo ajoutée')});
+ if(!ids.length)return;const cc=S.labo.find(x=>x.id===id)||{};const cur=cc.photos||[];const pc={...(cc.pcat||{})};ids.forEach(a=>pc[a]=cat);await W(()=>S.db.doc('labo/'+id).update({photos:[...cur,...ids],pcat:pc,maj:Date.now(),par:S.uid}),ids.length>1?ids.length+' photos ajoutées':'Photo ajoutée')});
 async function labShare(id){const c=S.labo.find(x=>x.id===id);if(!c)return;const g=$('#lb-grp')?.value||'prothese';const sec=LAB[c.section];
  const txt=`${sec.nom} : ${c.patient}\n${[c.travail,c.dents?'dent '+c.dents:'',c.teinte?'teinte '+c.teinte:'',c.materiau].filter(Boolean).join(', ')}\nÉtape : ${sec.steps[labStepIdx(c)][1]}${c.echeance?'\n'+sec.echeance+' : '+fmtDate(c.echeance,{weekday:'long',day:'numeric',month:'long'}):''}${c.notes?'\n'+c.notes:''}`;
  const prev=S.grp;S.grp=g;let ok=await postMsg({type:'text',texte:txt});for(const a of (c.photos||[]).slice(-4)){if(!ok)break;ok=await postMsg({type:'image',asset:a})}S.grp=prev;
@@ -1414,11 +1479,20 @@ async function loadRecettes(){const o=$('#reOut');if(!o)return;if(!S.db||!S.cfg.
 Views.pointage={
  mount(el){el.innerHTML=`<div class="stack"><div><div class="eyebrow">Présences</div><h1>Pointage</h1></div>${banners()}<div id="ptMine"></div>
  <div class="card"><h3 style="margin-bottom:6px">Mes 30 derniers jours</h3><div id="ptHist" class="small muted">Chargement…</div></div>
- ${S.isOwner?`<div class="card stack" style="gap:10px"><div class="row"><h3>Équipe</h3><span class="sp"></span><input class="inp" type="date" id="ptDate" value="${S.ptDate||today()}" style="width:auto" aria-label="Jour"><button class="ib" data-act="ptLoad" aria-label="Actualiser">${ic('refresh')}</button></div><div id="ptTeam" class="small muted">Chargement…</div></div>`:''}</div>`;
+ ${S.isOwner?`<div class="card stack" style="gap:10px"><h3>Position du cabinet</h3><div class="small muted">Les membres ne peuvent pointer leur arrivée et leur départ que s'ils se trouvent dans ce rayon autour du cabinet (vérification GPS). Votre propre pointage n'est pas limité.</div>
+  <div id="ptCab"></div></div>
+  <div class="card stack" style="gap:10px"><div class="row"><h3>Équipe</h3><span class="sp"></span><input class="inp" type="date" id="ptDate" value="${S.ptDate||today()}" style="width:auto" aria-label="Jour"><button class="ib" data-act="ptLoad" aria-label="Actualiser">${ic('refresh')}</button></div><div id="ptTeam" class="small muted">Chargement…</div></div>`:''}</div>`;
   if(S.isOwner)$('#ptDate').onchange=e=>{S.ptDate=e.target.value||today();loadTeam()};loadMyHist();if(S.isOwner)loadTeam()},
- update(){const b=$('#ptMine');if(!b)return;const st=ptState(S.myPointage);
+ updCab(){const b=$('#ptCab');if(!b)return;const c=S.cfg.cabinet;b.innerHTML=`${c?.lat!=null?`<div class="banner info">${ic('check')}Position enregistrée (${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}), rayon ${esc(c.rayon||150)} m. <a href="https://maps.google.com/?q=${c.lat},${c.lng}" target="_blank" rel="noopener">Voir sur la carte</a></div>`:`<div class="banner warn">${ic('alert')}Position non définie : le pointage n'est pas encore limité au cabinet.</div>`}
+  <div class="row" style="gap:8px;flex-wrap:wrap"><label class="f" style="width:140px">Rayon (mètres)<input class="inp" type="number" min="30" max="2000" step="10" id="ptRayon" value="${esc(c?.rayon||150)}"></label><span class="sp"></span><button class="btn pri" data-act="ptSetCab">${ic('refresh')}Enregistrer ma position actuelle comme cabinet</button>${c?.lat!=null?`<button class="btn ghost" data-act="ptRayon">Modifier le rayon</button>`:''}</div>`},
+ update(){Views.pointage.updCab();const b=$('#ptMine');if(!b)return;const st=ptState(S.myPointage);
   b.innerHTML=`<div class="clock"><div class="bigtime">${nowHM()}</div><div class="st">${st.sessions.length?st.sessions.map(s=>`${hm(s.in)} → ${s.out?hm(s.out):'en cours'}`).join(' · ')+` · total ${dur(st.total)}`:'Pas encore de pointage aujourd\'hui.'}</div>
-  <button class="btn big" data-act="pointer">${ic('clock')}${st.inside?'Pointer le départ':'Pointer l\'arrivée'}</button></div>`}};
+  <button class="btn big" data-act="pointer">${ic('clock')}${st.inside?'Pointer le départ':'Pointer l\'arrivée'}</button>${S.cfg.cabinet?.lat!=null&&!S.isOwner?'<div class="small" style="opacity:.8;margin-top:8px">Pointage possible uniquement au cabinet (position vérifiée).</div>':''}</div>`}};
+async function ptSetCab(){if(!await ask('Enregistrer votre position actuelle comme position du cabinet ? Faites-le à l\'intérieur du cabinet.','Enregistrer'))return;
+ toast('Localisation en cours…');let c;try{c=await getPos()}catch(e){toast(geoErr(e),'err');return}
+ if(c.accuracy>80)toast('Précision faible ('+Math.round(c.accuracy)+' m). Si possible, réessayez avec le Wi-Fi activé.','err');
+ const rayon=Math.max(30,Math.min(2000,Number($('#ptRayon')?.value)||150));
+ W(()=>S.db.doc('cfg/cabinet').set({lat:c.latitude,lng:c.longitude,rayon,precision:Math.round(c.accuracy),maj:Date.now()}),'Position du cabinet enregistrée')}
 async function loadMyHist(){const h=$('#ptHist');if(!h)return;if(!S.db||!S.uid){h.textContent='Indisponible.';return}
  try{const s=await S.db.collection(`pointage/${S.uid}/j`).orderBy('date','desc').limit(30).get();const rows=s.docs.map(d=>d.data());
   h.innerHTML=rows.length?`<div class="tablewrap"><table><thead><tr><th>Jour</th><th>Arrivée</th><th>Départ</th><th class="r">Durée</th></tr></thead><tbody>${rows.map(r=>{const st=ptState(r);return `<tr><td>${esc(fmtDate(r.date,{weekday:'short',day:'numeric',month:'short'}))}</td><td class="num">${st.first?hm(st.first):'—'}</td><td class="num">${st.last?.out?hm(st.last.out):'—'}</td><td class="r num">${dur(st.total)}</td></tr>`}).join('')}</tbody></table></div>`:'Aucun pointage enregistré.'}catch(e){h.textContent='Chargement impossible.'}}
@@ -1573,7 +1647,7 @@ const Acts={
   const ok=await W(()=>S.db.doc('messages/'+a.dataset.id).delete());if(ok&&m?.asset&&S.assets){try{await S.assets.delete(m.asset)}catch(e){}}},
  zoom:a=>{openModal({title:'Photo',ok:null,cancel:'Fermer',body:`<img src="${esc(a.getAttribute('src'))}" alt="${esc(a.alt)}" style="width:100%;border-radius:10px">`})},
  stockEdit:a=>{if(perm('stock_edit'))stockEdit(a.dataset.id)},qty:a=>changeQty(a.dataset.id,Number(a.dataset.n)),
- stFilter:a=>{S.stockFilter=a.dataset.k;S.stockQ='';const q=$('#stq');if(q)q.value='';stockUpdate();window.scrollTo(0,0)},stockCatalog:a=>stockCatalog(a.dataset.k),scanIn:()=>{S.scanMode='in';scanModal()},scanOut:()=>{S.scanMode='out';scanModal()},stockLow:()=>{S.stockFilter='bas';go('stock')},orderList,
+ stFilter:a=>{S.stockFilter=a.dataset.k;S.stockQ='';const q=$('#stq');if(q)q.value='';stockUpdate();window.scrollTo(0,0)},stockCatalog:a=>stockCatalog(a.dataset.k),ptSetCab,ptRayon:()=>{const r=Math.max(30,Math.min(2000,Number($('#ptRayon')?.value)||150));W(()=>S.db.doc('cfg/cabinet').update({rayon:r}),'Rayon : '+r+' m')},scanIn:()=>{S.scanMode='in';scanModal()},scanOut:()=>{S.scanMode='out';scanModal()},stockLow:()=>{S.stockFilter='bas';go('stock')},orderList,
  caTab:a=>{S.caisseTab=a.dataset.t;go('caisse')},caActivate,reLoad:loadRecettes,
  rePick:a=>{S.reDate=a.dataset.d;const i=$('#reDate');if(i)i.value=a.dataset.d;loadRecettes();window.scrollTo(0,0)},
  reDel:async a=>{if(!await ask('Supprimer cet encaissement ?','Supprimer'))return;if(await W(()=>S.db.doc(`recettes/${a.dataset.u}/e/${a.dataset.id}`).delete(),'Encaissement supprimé'))loadRecettes()},
@@ -1583,10 +1657,10 @@ const Acts={
  verifyResend:async()=>{try{await firebase.auth().currentUser.sendEmailVerification();toast('Lien renvoyé')}catch(e){toast(authMsg(e),'err')}},
  verifyCheck:async()=>{const u=firebase.auth().currentUser;await u.reload();if(u.emailVerified){await u.getIdToken(true);location.reload()}else toast('E-mail pas encore confirmé.','err')},
  installApp:installApp,memDelete:a=>memDelete(a.dataset.u),memReset:a=>memReset(a.dataset.u),logout,
- labTab:a=>{S.labTab=a.dataset.t;S.labFilter='encours';S.stockFilter='tous';go('labo')},labFilter:a=>{S.labFilter=a.dataset.k;Views.labo.update()},
+ alVoir:()=>{S.labTab='aligneurs';S.labFilter='remettre';go('labo')},labTab:a=>{S.labTab=a.dataset.t;S.labFilter='encours';S.stockFilter='tous';go('labo')},labFilter:a=>{S.labFilter=a.dataset.k;Views.labo.update()},
  labNew:()=>labModal(),labOpen:a=>labModal(S.labo.find(x=>x.id===a.dataset.id)),
  labNext:a=>{const c=S.labo.find(x=>x.id===a.dataset.id);if(!c)return;const nx=LAB[c.section].steps[labStepIdx(c)+1];if(nx)labSetStep(c,nx[0])},
- labAddPhoto:a=>{if(!S.assets){toast('L\'ajout de photos demande un accès Éditeur à la page.','err');return}S.labUpId=a.dataset.id;$('#labfile').click()},
+ labAddPhoto:a=>{if(!S.assets){toast('L\'ajout de photos demande un accès Éditeur à la page.','err');return}S.labUpId=a.dataset.id;S.labCat=a.dataset.c||'travail';$('#labfile').click()},alRemis:a=>{if(a.closest('#dlg'))$('#dlg').close();alRemis(a.dataset.id)},
  labZoom:async a=>{const src=await blobReady(a.dataset.a);const w=window.open?null:null;const d=$('#ask');d.innerHTML=`<div class="dlg-in"><div class="dlg-b"><img src="${esc(src)}" alt="Photo du travail" style="width:100%;border-radius:12px"></div><footer><span class="sp"></span><button class="btn pri" id="askn">Fermer</button></footer></div>`;$('#askn').onclick=()=>d.close();d.onclose=null;d.showModal()},
  labShare:a=>labShare(a.dataset.id),memRefuse:async a=>{const u=a.dataset.u;if(await ask('Refuser l\'accès de '+nameOf(u)+' ?','Refuser'))setMember(u,{statut:'refuse',le:Date.now()},'Demande refusée')},
  openPat:a=>openPatient(a.dataset.id),patMode:a=>{S.patMode=a.dataset.m;S.patLetter='';searchPatients()},patLetter:a=>{S.patLetter=a.dataset.l;searchPatients()},patMore:a=>{a.disabled=true;a.textContent='Chargement…';loadPatPage(true)},closePat:()=>{closePatient();go('patients')},patNew:()=>patModal(),patEdit:()=>patModal(S.patDoc),
