@@ -349,6 +349,8 @@ fieldset.fs{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:1
 <script src="firebase-app-compat.js"></script>
 <script src="firebase-auth-compat.js"></script>
 <script src="firebase-firestore-compat.js"></script>
+<script src="firebase-storage-compat.js"></script>
+<script src="firebase-messaging-compat.js"></script>
 <script src="config.js"></script>
 <script>
 "use strict";
@@ -470,7 +472,7 @@ const myGroups=()=>{if(S.isOwner)return groups();const g=memberOf(S.uid)?.groupe
 const roleOf=u=>(u===S.uid&&S.isOwner)?'dentiste':(memberOf(u)?.role||'');
 const teamMembers=()=>members().filter(u=>(u===S.uid&&S.isOwner)||statutOf(u)==='actif');
 function gated(){if(S.isOwner)return false;return !S.ready||!S.authUser||S.adminUnverified||!S.cfgLoaded||!S.annuaireLoaded||!S.membreLoaded||statutOf(S.uid)!=='actif'}
-async function logout(){try{await firebase.auth().signOut()}catch(e){}location.reload()}
+async function logout(){try{const t=ls.get('ns_push_token','');if(t&&S.db&&S.uid)await S.db.doc('tokens/'+S.uid).set({list:firebase.firestore.FieldValue.arrayRemove(t)},{merge:true});ls.set('ns_push_token','')}catch(e){}try{await firebase.auth().signOut()}catch(e){}location.reload()}
 function reroute(){if(document.activeElement?.closest?.('#gateForm'))return;if(S.view==='attente'||gated()||!allowedView(S.view))go(S.view==='attente'?'accueil':S.view)}
 const ADMINS=(window.NS_CONFIG?.adminEmails||[]).map(e=>String(e).toLowerCase());
 function authMsg(e){const c=e?.code||'';
@@ -510,7 +512,7 @@ function errMsg(e){const c=e&&e.code;
  if(c==='invalid_argument')return 'Action non autorisée pour votre profil.';
  if(c==='quota_exceeded')return 'Stockage plein : supprimez d\'anciens messages (Équipe › Maintenance).';
  if(c==='resource_exhausted'||c==='rate_limited')return 'Trop d\'actions d\'un coup. Attendez quelques secondes.';
- if(c==='too_large')return 'Fichier trop volumineux : photos et PDF jusqu\'à 700 Ko, vocaux jusqu\'à 1 minute 30 environ.';
+ if(c==='too_large')return 'Fichier trop volumineux (20 Mo maximum).';
  return 'L\'enregistrement a échoué. Vérifiez la connexion et réessayez.'}
 async function W(fn,ok){if(!S.db){toast('Connexion au serveur impossible.','err');return false}
  try{await fn();if(ok)toast(ok);return true}catch(e){console.warn(e);toast(errMsg(e),'err');return false}}
@@ -609,6 +611,7 @@ Views.accueil={update(el){
   <button class="btn big" data-act="pointer">${ic('clock')}${st.inside?'Pointer le départ':'Pointer l\'arrivée'}</button>
  </section>`:''}
  ${installCard()}
+ ${notifCard()}
  <nav class="tiles" aria-label="Modules" style="--cols:${mods.length%4===0?4:mods.length%5===0?5:mods.length%3===0?3:4};--colsd:${mods.length}">${mods.map(n=>{const u=n.id==='groupes'?totalUnread():0;const sh=typeof n.short==='function'?n.short():n.short;
   return `<button class="mtile" data-go="${n.id}"><span class="gold">${ic(icn(n))}</span><span>${esc(sh)}</span>${u?`<span class="badge">${u}</span>`:''}</button>`}).join('')}</nav>
  <div class="grid2">
@@ -817,11 +820,11 @@ $('#audfile').addEventListener('change',async e=>{const f=e.target.files[0];e.ta
 async function startRec(){if(!(navigator.mediaDevices?.getUserMedia&&window.MediaRecorder)){$('#audfile').click();return}
  let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:true})}catch(e){toast('Micro refusé : autorisez-le dans les réglages, ou choisissez un fichier audio.','err');$('#audfile').click();return}
  const mime=['audio/webm;codecs=opus','audio/mp4','audio/webm','audio/aac'].find(t=>MediaRecorder.isTypeSupported?.(t))||'';
- const rec=new MediaRecorder(stream,mime?{mimeType:mime,audioBitsPerSecond:32000}:{audioBitsPerSecond:32000});const chunks=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+ const rec=new MediaRecorder(stream,mime?{mimeType:mime,audioBitsPerSecond:64000}:{audioBitsPerSecond:64000});const chunks=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
  const comp=$('.composer');const bar=document.createElement('div');bar.className='recbar';
  bar.innerHTML=`<span class="dot"></span><span id="recT" class="num">0:00</span><span class="sp"></span><button class="btn ghost" type="button" id="recX">Annuler</button><button class="btn pri" type="button" id="recOk">${ic('send')}Envoyer</button>`;
  comp.hidden=true;comp.after(bar);const t0=Date.now();let send=false,done=false;
- const iv=setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000);const el=$('#recT');if(el)el.textContent=Math.floor(s/60)+':'+pad(s%60);if(s>=90)stop(true)},300);
+ const iv=setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000);const el=$('#recT');if(el)el.textContent=Math.floor(s/60)+':'+pad(s%60);if(s>=300)stop(true)},300);
  const stop=ok=>{if(done)return;done=true;send=ok;clearInterval(iv);try{rec.stop()}catch(e){}stream.getTracks().forEach(t=>t.stop());bar.remove();comp.hidden=false};
  rec.onstop=async()=>{if(!send)return;const type=(rec.mimeType||mime||'audio/webm').split(';')[0];const blob=new Blob(chunks,{type});if(blob.size<800){toast('Message trop court.','err');return}
   toast('Envoi du message vocal…');try{const up=await S.assets.upload(blob,{type});await postMsg({type:'audio',asset:up.id});toast('Message vocal envoyé')}catch(err){console.warn(err);toast(errMsg(err),'err')}};
@@ -1116,6 +1119,7 @@ Views.equipe={mount(el){const a=S.annuaire[S.uid]||{};
  <form class="card stack" id="meForm" novalidate><h3>Mon nom dans l'application</h3><div class="row"><input class="inp" id="me-nom" name="nom" placeholder="Prénom Nom" value="${esc(a.nom||'')}" style="flex:1;min-width:180px"><button class="btn pri" type="submit">Enregistrer</button></div>
  <div class="small muted">Rôle : ${esc(S.isOwner?'Propriétaire du cabinet':ROLES[myRole()]||'non attribué')}</div>
  ${!S.isOwner?`<div class="small muted">E-mail : ${esc(a.email||S.me?.email||'non renseigné')}</div><div class="small muted">Accès : ${esc(MODULES.filter(([k])=>perm(k)).map(([,l])=>l).join(', ')||'aucun module')}.</div>`:''}</form>
+ <section class="card stack" style="gap:8px"><h3>Notifications</h3><div class="small muted" id="notifState">${('Notification' in window)&&Notification.permission==='granted'?'Activées sur cet appareil.':'Non activées sur cet appareil.'}</div><button class="btn ghost" type="button" data-act="enableNotif" style="align-self:flex-start">${ic('chat')}Activer ou réactiver sur cet appareil</button></section>
  ${S.authUser?`<form class="card stack" id="pwForm" novalidate><h3>Changer mon mot de passe</h3><div class="fgrid"><label class="f">Nouveau mot de passe<input class="inp" type="password" id="pw-new" autocomplete="new-password"></label><label class="f">Confirmation<input class="inp" type="password" id="pw-new2" autocomplete="new-password"></label></div>
  <div class="row"><button class="btn pri" type="submit">Changer le mot de passe</button><span class="sp"></span><button class="btn ghost" type="button" data-act="logout">Se déconnecter</button></div></form>`:''}
  ${S.isOwner?`<section class="card stack" style="gap:6px" id="eqPending"></section>
@@ -1277,6 +1281,24 @@ function installCard(){if(isStandalone()||ls.get('ns_install_hide',0))return '';
  return `<section class="card install"><img src="apple-touch-icon.png" alt=""><div class="grow" style="flex:1;min-width:0"><h3>Installer l'application</h3><div class="small muted">${ios?'Dans Safari, touchez le bouton Partager puis « Sur l\'écran d\'accueil ».':'Ajoutez Natural Smile à votre écran d\'accueil pour l\'ouvrir comme une application.'}</div></div>${deferredPrompt?'<button class="btn pri" data-act="installApp">Installer</button>':''}<button class="ib" data-act="installHide" aria-label="Masquer">${ic('x')}</button></section>`}
 async function installApp(){if(!deferredPrompt)return;deferredPrompt.prompt();try{await deferredPrompt.userChoice}catch(e){}deferredPrompt=null;refresh('accueil')}
 Acts.installHide=()=>{ls.set('ns_install_hide',1);refresh('accueil')};
+/* ---- Notifications ---- */
+const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+async function pushSupported(){try{if(!('Notification' in window)||!('serviceWorker' in navigator)||!window.firebase?.messaging)return false;return !!(await Promise.resolve(firebase.messaging.isSupported()))}catch(e){return false}}
+async function saveToken(){const reg=await navigator.serviceWorker.ready;
+ const token=await firebase.messaging().getToken({vapidKey:window.NS_CONFIG?.vapidKey,serviceWorkerRegistration:reg});if(!token)return false;
+ if(ls.get('ns_push_token','')!==token){await S.db.doc('tokens/'+S.uid).set({list:firebase.firestore.FieldValue.arrayUnion(token),maj:Date.now(),appareil:navigator.userAgent.slice(0,120)},{merge:true});ls.set('ns_push_token',token)}
+ return true}
+async function enableNotif(){
+ if(!(await pushSupported())){toast(isIOS&&!isStandalone()?'Installez d\'abord l\'application sur l\'écran d\'accueil (Safari › Partager › Sur l\'écran d\'accueil), puis ouvrez-la depuis l\'icône.':'Les notifications ne sont pas prises en charge sur ce navigateur.','err');return}
+ let perm=Notification.permission;if(perm!=='granted'){try{perm=await Notification.requestPermission()}catch(e){perm='denied'}}
+ if(perm!=='granted'){toast('Notifications refusées. Autorisez-les dans les réglages du téléphone pour Natural Smile.','err');refresh();return}
+ try{await saveToken();toast('Notifications activées sur cet appareil');}catch(e){console.warn(e);toast('Activation impossible. Réessayez dans un instant.','err')}refresh()}
+async function notifSilent(){try{if(Notification?.permission==='granted'&&await pushSupported())await saveToken()}catch(e){console.warn(e)}
+ try{if(window.firebase?.messaging&&await pushSupported()&&!S.fgMsg){S.fgMsg=true;firebase.messaging().onMessage(p=>{const n=p.notification||{};const g=p.data?.groupe;if(!(S.view==='groupes'&&S.grp===g))toast((n.title?n.title+' · ':'')+(n.body||''))})}}catch(e){}}
+function notifCard(){if(!('Notification' in window)&&!isIOS)return '';const st=('Notification' in window)?Notification.permission:'default';if(st==='granted'||ls.get('ns_notif_hide',0))return '';
+ if(isIOS&&!isStandalone())return '';
+ return `<section class="card install"><span class="gold" style="width:48px;height:48px;border-radius:14px;display:grid;place-items:center;flex:none">${ic('chat')}</span><div style="flex:1;min-width:0"><h3>Activer les notifications</h3><div class="small muted">${st==='denied'?'Les notifications sont bloquées : autorisez-les dans les réglages du téléphone pour Natural Smile.':'Recevez une alerte pour chaque nouveau message de vos groupes, même téléphone verrouillé.'}</div></div>${st==='denied'?'':'<button class="btn pri" data-act="enableNotif">Activer</button>'}<button class="ib" data-act="notifHide" aria-label="Masquer">${ic('x')}</button></section>`}
+Acts.enableNotif=enableNotif;Acts.notifHide=()=>{ls.set('ns_notif_hide',1);refresh('accueil')};
 function addSub(fn){S.dataSubs.push(fn)}
 function stopData(){(S.dataSubs||[]).forEach(f=>{try{f()}catch(e){}});S.dataSubs=[];S.subs.rdvSel?.();S.subs.rdvSel=null;S.dataStarted=false}
 function startData(){if(S.dataStarted||gated())return;S.dataStarted=true;const db=S.db;const w=e=>console.warn(e);
@@ -1287,7 +1309,7 @@ function startData(){if(S.dataStarted||gated())return;S.dataStarted=true;const d
  if(perm('mod_checklists'))addSub(db.collection('executions').where('date','==',today()).onSnapshot(s=>{S.execToday=s.docs.map(d=>({id:d.id,...d.data()}));refresh('checklists','accueil')},w));
  if(perm('mod_pointage'))addSub(db.doc(`pointage/${S.uid}/j/${today()}`).onSnapshot(s=>{S.myPointage=s.exists?s.data():null;refresh('accueil','pointage')},w));
  if(perm('caisse'))addSub(db.collection(`recettes/${S.uid}/e`).where('date','==',today()).onSnapshot(s=>{S.myRecCount=s.size;refresh('caisse')},w));
- refresh()}
+ refresh();notifSilent()}
 function restartData(){stopData();S.rdvToday=[];S.latest=[];S.stock=[];S.labo=[];S.execToday=[];startData()}
 let membresAllSub=null;
 function watchMembers(){if(membresAllSub)return;membresAllSub=S.db.collection('membres').onSnapshot(s=>{const m={};s.docs.forEach(d=>m[d.id]=d.data());S.membres=m;S.membreLoaded=true;afterMembers()},e=>console.warn(e))}
@@ -1305,14 +1327,12 @@ async function boot(){
  const db=firebase.firestore();try{db.settings({ignoreUndefinedProperties:true,merge:true})}catch(e){}
  try{await db.enablePersistence({synchronizeTabs:true})}catch(e){}
  S.db=db;
- const MAXB=700000;
- const toDataURL=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(b)});
- S.assets={async upload(blob,o){let type=(o&&o.type)||blob.type||'application/octet-stream';
-   if(type.startsWith('image/')&&blob.size>MAXB){for(const [m,q] of [[1600,.78],[1300,.72],[1000,.65]]){blob=await compressImg(blob,m,q);type='image/jpeg';if(blob.size<=MAXB)break}}
-   if(blob.size>MAXB){const e=new Error('too_large');e.code='too_large';throw e}
-   const data=await toDataURL(new Blob([blob],{type}));const ref=db.collection('fichiers').doc();
-   await ref.set({data,type,taille:blob.size,by:S.uid,ts:Date.now()});FS.cache.set(ref.id,data);return {id:'fs:'+ref.id,url:data}},
-  async delete(id){id=String(id||'');if(id.startsWith('fs:'))await db.doc('fichiers/'+id.slice(3)).delete()}};
+ const storage=firebase.storage();
+ S.assets={async upload(blob,o){const type=(o&&o.type)||blob.type||'application/octet-stream';
+   if(blob.size>20*1024*1024){const e=new Error('too_large');e.code='too_large';throw e}
+   const ext=({'image/jpeg':'jpg','image/png':'png','application/pdf':'pdf','audio/webm':'webm','audio/mp4':'m4a','audio/aac':'aac','audio/mpeg':'mp3','video/mp4':'mp4','video/webm':'webm'})[type]||'bin';
+   const ref=storage.ref(`uploads/${S.uid}/${uidGen()}.${ext}`);await ref.put(blob,{contentType:type});const url=await ref.getDownloadURL();return {id:url,url}},
+  async delete(id){id=String(id||'');if(id.startsWith('fs:'))await db.doc('fichiers/'+id.slice(3)).delete();else if(/^https?:/.test(id))await storage.refFromURL(id).delete()}};
  window.addEventListener('online',()=>{S.offline=false;refresh()});window.addEventListener('offline',()=>{S.offline=true;refresh()});S.offline=!navigator.onLine;
  firebase.auth().onAuthStateChanged(async u=>{
   if(!u){if(S.authUser){location.reload();return}S.authUser=null;S.ready=true;go('attente');return}
