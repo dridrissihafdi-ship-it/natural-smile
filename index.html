@@ -296,6 +296,9 @@ fieldset.fs{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:1
 .lab-mark{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;flex:none}
 .lab-mark svg{width:26px;height:26px}
 .lab-kpis{display:flex;gap:26px;flex-wrap:wrap;padding:14px 18px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg)}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px}.segb{display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:11px 8px;font:inherit;font-weight:600;color:var(--muted);cursor:pointer}
+.segb svg{width:18px;height:18px}.segb[data-m=in][aria-pressed=true]{background:var(--ok,#2f7d4f);border-color:transparent;color:#fff}.segb[data-m=out][aria-pressed=true]{background:var(--bad);border-color:transparent;color:#fff}
+.scanv{border-radius:14px;overflow:hidden;background:#111;min-height:120px;border:1px solid var(--line)}.scanv video{width:100%!important;display:block}
 .segtabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
 .segtabs::-webkit-scrollbar{display:none}
 .segtab{display:flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:9px 13px;cursor:pointer;font-weight:600;white-space:nowrap;flex:none;color:var(--muted)}
@@ -398,7 +401,7 @@ const I={
  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
  book:'<path d="M4 4h6a2 2 0 012 2v14a2 2 0 00-2-2H4z"/><path d="M20 4h-6a2 2 0 00-2 2v14a2 2 0 012-2h6z"/>',
  users:'<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><path d="M16 4.5a3.5 3.5 0 010 7M22 20c0-3-2-5-5-5.7"/>',
- plus:'<path d="M12 5v14M5 12h14"/>',minus:'<path d="M5 12h14"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',scan:'<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8v8M10 8v8M14 8v8M17 8v8"/>',minus:'<path d="M5 12h14"/>',
  x:'<path d="M6 6l12 12M18 6L6 18"/>',
  left:'<path d="M15 5l-7 7 7 7"/>',right:'<path d="M9 5l7 7-7 7"/>',
  send:'<path d="M4 12l16-8-6 16-3-6z"/>',
@@ -1120,6 +1123,69 @@ function tplEdit(id){const T=templates().map(t=>({...t}));const t=T.find(x=>x.id
   return W(()=>S.db.doc('cfg/checklists').set({liste:list}),'Modèle enregistré')},
  onDel:async()=>{if(!await ask('Supprimer ce modèle ? Les checklists déjà faites restent dans l\'historique.','Supprimer'))return false;return W(()=>S.db.doc('cfg/checklists').set({liste:T.filter(x=>x.id!==t.id)}),'Modèle supprimé')}})}
 
+/* ---- Codes-barres : entrée et sortie du stock par scan ---- */
+// Lit un code EAN/UPC ou GS1 (DataMatrix, GS1-128) : renvoie la clé (GTIN sur 14 chiffres si possible), le lot et la péremption.
+function parseCode(raw){let s=String(raw||'').trim().replace(/^\][A-Za-z]\d/,'');const out={raw:s,key:'',lot:'',exp:''};if(!s)return out;
+ const GS='\x1d';
+ if(/^\(\d{2,4}\)/.test(s)){const re=/\((\d{2,4})\)([^(]*)/g;let m;while((m=re.exec(s))){const ai=m[1],v=m[2].trim();if(ai==='01'||ai==='02')out.gtin=v;else if(ai==='10')out.lot=v;else if(ai==='17')out.exp=v}}
+ else if(/^(01|02)\d{14}/.test(s)){const FIX={'00':18,'01':14,'02':14,'11':6,'12':6,'13':6,'15':6,'16':6,'17':6,'20':2};let i=0,guard=0;
+  while(i<s.length&&guard++<20){if(s[i]===GS){i++;continue}const ai2=s.substr(i,2);
+   if(FIX[ai2]){const v=s.substr(i+2,FIX[ai2]);if(ai2==='01'||ai2==='02')out.gtin=v;if(ai2==='17')out.exp=v;i+=2+FIX[ai2];continue}
+   let ai=ai2;if(/^(24|25|71|72|80|81|82)/.test(ai2))ai=s.substr(i,3);if(/^(70|73|74)/.test(ai2))ai=s.substr(i,4);
+   let j=s.indexOf(GS,i+ai.length);if(j<0)j=s.length;const v=s.slice(i+ai.length,j);if(ai==='10')out.lot=v;i=j}}
+ if(out.exp&&/^\d{6}$/.test(out.exp)){const y=2000+ +out.exp.slice(0,2),mo=out.exp.slice(2,4),d=out.exp.slice(4,6);out.exp=`${y}-${mo}-${d==='00'?'28':d}`}else out.exp='';
+ const g=out.gtin||(/^\d{8,14}$/.test(s)?s:'');out.key=g?g.padStart(14,'0'):s.replace(/\s+/g,'').toUpperCase();return out}
+const itemByCode=key=>zoneItems().find(i=>(i.codes||[]).includes(key));
+let beepCtx=null;function beep(ok){try{beepCtx=beepCtx||new (window.AudioContext||window.webkitAudioContext)();const o=beepCtx.createOscillator(),g=beepCtx.createGain();o.frequency.value=ok?1250:330;g.gain.value=.08;o.connect(g);g.connect(beepCtx.destination);o.start();o.stop(beepCtx.currentTime+(ok?.09:.25))}catch(e){}try{navigator.vibrate?.(ok?60:[80,60,80])}catch(e){}}
+async function stockMove(it,n,c){const F=firebase.firestore.FieldValue;const data={qte:F.increment(n),maj:Date.now(),par:S.uid};
+ const mv={ts:Date.now(),by:S.uid,n:Math.abs(n),...(c.lot?{lot:c.lot}:{}),...(c.exp?{exp:c.exp}:{})};
+ if(n>0){data.derEntree=mv;if(c.exp&&(!it.peremption||qtyOf(it)<=0||c.exp<it.peremption))data.peremption=c.exp}else data.derSortie=mv;
+ delete S.stockLocal[it.id];await S.db.doc('stock/'+it.id).update(data)}
+function scanModal(){const lab=S.stockZone==='labo';const CATS=lab?LAB_CATS:STOCK_CATS;S.scan={mode:S.scanMode||'out',n:1,log:[],last:{},pending:null};
+ const d=openModal({title:'Scanner les codes-barres',ok:null,cancel:'Terminer',body:`
+  <div class="seg" role="group" aria-label="Mouvement"><button type="button" data-m="in" class="segb">${ic('plus')}Entrée (réception)</button><button type="button" data-m="out" class="segb">${ic('minus')}Sortie (utilisation)</button></div>
+  <div class="row" style="gap:8px;align-items:center"><span class="small muted">Quantité par scan</span><span class="sp"></span><button type="button" class="ib" id="sc-m" aria-label="Moins">${ic('minus')}</button><b id="sc-n" style="min-width:2ch;text-align:center">1</b><button type="button" class="ib" id="sc-p" aria-label="Plus">${ic('plus')}</button></div>
+  <div id="scanv" class="scanv"><div class="small muted" style="padding:30px 12px;text-align:center">Ouverture de la caméra…</div></div>
+  <label class="f">Ou saisissez le code (douchette USB/Bluetooth)<input class="inp" id="sc-code" inputmode="text" autocomplete="off" placeholder="Code puis Entrée"></label>
+  <section id="sc-new" class="card stack" style="gap:10px;padding:14px" hidden></section>
+  <div id="sc-log" class="stack" style="gap:0"></div>`});
+ d.querySelector('form').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.tagName==='INPUT')e.preventDefault()});const segs=d.querySelectorAll('.segb');const setMode=m=>{S.scan.mode=S.scanMode=m;segs.forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===m))};segs.forEach(b=>b.onclick=()=>setMode(b.dataset.m));setMode(S.scan.mode);
+ const setN=v=>{S.scan.n=Math.max(1,Math.min(999,v));$('#sc-n').textContent=S.scan.n};$('#sc-m').onclick=()=>setN(S.scan.n-1);$('#sc-p').onclick=()=>setN(S.scan.n+1);
+ const ci=$('#sc-code');ci.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const v=ci.value;ci.value='';if(v.trim())onCode(v,true)}});
+ let cam=null,stopped=false;
+ const drawLog=()=>{$('#sc-log').innerHTML=S.scan.log.length?`<div class="small muted" style="padding:6px 2px">Mouvements de cette session</div>`+S.scan.log.map((l,k)=>`<div class="stk"><div class="grow"><div style="font-weight:600">${l.n>0?'<span class="pill ok">+'+l.n+'</span>':'<span class="pill bad">'+l.n+'</span>'} ${esc(l.nom)}</div><div class="small muted">${esc([l.lot?'Lot '+l.lot:'',l.exp?'Pér. '+fmtDate(l.exp,{month:'short',year:'numeric'}):''].filter(Boolean).join(', ')||'Stock : '+l.after+' '+(l.unite||''))}</div></div>${l.undone?'<span class="small muted">Annulé</span>':`<button type="button" class="btn ghost" data-undo="${k}">Annuler</button>`}</div>`).join(''):''};
+ $('#sc-log').onclick=async e=>{const b=e.target.closest('[data-undo]');if(!b)return;const l=S.scan.log[+b.dataset.undo];const it=S.stock.find(x=>x.id===l.id);if(!it||l.undone)return;
+  if(await W(()=>S.db.doc('stock/'+it.id).update({qte:firebase.firestore.FieldValue.increment(-l.n),maj:Date.now(),par:S.uid}),'Mouvement annulé')){l.undone=true;drawLog()}};
+ const apply=async(it,c)=>{const n=S.scan.mode==='in'?S.scan.n:-S.scan.n;const cur=qtyOf(it);
+  if(n<0&&cur<=0){beep(false);toast(`« ${it.nom} » est déjà à 0 en stock.`,'err');return}
+  const nn=n<0?-Math.min(-n,cur):n;
+  if(await W(()=>stockMove(it,nn,c))){beep(true);S.scan.log.unshift({id:it.id,nom:it.nom,unite:it.unite,n:nn,after:cur+nn,lot:c.lot,exp:c.exp});drawLog();
+   toast(`${nn>0?'+'+nn:nn} ${it.nom}`);if(c.exp&&nn>0&&c.exp<new Date(Date.now()+60*864e5).toISOString().slice(0,10))toast('Attention : péremption proche ('+fmtDate(c.exp,{day:'numeric',month:'short',year:'numeric'})+')','err')}};
+ const askNew=c=>{const P=$('#sc-new');S.scan.pending=c;beep(false);const its=zoneItems().slice().sort((a,b)=>(a.nom||'').localeCompare(b.nom||'','fr'));
+  P.hidden=false;P.innerHTML=`<div><b>Code inconnu</b> <span class="small muted">${esc(c.key)}${c.lot?', lot '+esc(c.lot):''}</span></div>
+   <div class="small muted">Associez ce code à un article existant, ou créez l'article. Les prochains scans de ce produit seront reconnus automatiquement.</div>
+   <label class="f">Article<input class="inp" id="sc-nom" list="dl-scn" autocomplete="off" placeholder="Nom de l'article"></label><datalist id="dl-scn">${its.map(i=>`<option value="${esc(i.nom)}">`).join('')}${lab?'':CATS.flatMap(catItems).map(x=>`<option value="${esc(x.nom)}">`).join('')}</datalist>
+   <div class="fgrid" id="sc-newf"><label class="f">Section<select class="inp" id="sc-cat">${CATS.map(x=>`<option ${x===S.stockFilter?'selected':''}>${esc(x)}</option>`).join('')}</select></label><label class="f">Unité<input class="inp" id="sc-un" placeholder="boîte, pièce…"></label></div>
+   <div class="row" style="gap:8px"><span class="sp"></span><button type="button" class="btn ghost" id="sc-skip">Ignorer</button><button type="button" class="btn pri" id="sc-ok">Enregistrer</button></div>`;
+  const nm=$('#sc-nom');const sync=()=>{const ex=its.find(i=>norm(i.nom)===norm(nm.value));$('#sc-newf').hidden=!!ex;$('#sc-ok').textContent=ex?'Associer et '+(S.scan.mode==='in'?'ajouter':'retirer'):'Créer l\'article';
+   if(!ex&&!lab){for(const s of STOCK_SECTIONS){const x=catItems(s.n).find(y=>y.nom===nm.value.trim());if(x){$('#sc-cat').value=s.n;if(!$('#sc-un').value)$('#sc-un').value=x.unite;break}}}};
+  nm.addEventListener('input',sync);nm.addEventListener('change',sync);sync();setTimeout(()=>nm.focus(),50);
+  $('#sc-skip').onclick=()=>{P.hidden=true;S.scan.pending=null};
+  $('#sc-ok').onclick=async()=>{const name=nm.value.trim();if(!name){toast('Indiquez l\'article.','err');return}const ex=its.find(i=>norm(i.nom)===norm(name));
+   if(ex){if(!await W(()=>S.db.doc('stock/'+ex.id).update({codes:firebase.firestore.FieldValue.arrayUnion(c.key)})))return;ex.codes=[...(ex.codes||[]),c.key];P.hidden=true;S.scan.pending=null;await apply(ex,c);return}
+   if(S.scan.mode==='out'){toast('Créez d\'abord l\'article par une entrée.','err');return}
+   const n=S.scan.n;const ref=S.db.collection('stock').doc();const data={nom:name,cat:$('#sc-cat').value,unite:$('#sc-un').value.trim(),qte:n,seuil:0,lieu:'',fournisseur:'',codes:[c.key],zone:S.stockZone||'cabinet',maj:Date.now(),par:S.uid,
+    derEntree:{ts:Date.now(),by:S.uid,n,...(c.lot?{lot:c.lot}:{}),...(c.exp?{exp:c.exp}:{})},...(c.exp?{peremption:c.exp}:{})};
+   if(await W(()=>ref.set(data),'Article créé')){beep(true);S.scan.log.unshift({id:ref.id,nom:name,unite:data.unite,n,after:n,lot:c.lot,exp:c.exp});drawLog();P.hidden=true;S.scan.pending=null}}};
+ async function onCode(raw,manual){if(S.scan.pending)return;const c=parseCode(raw);if(!c.key)return;const now=Date.now();
+  if(!manual&&S.scan.last[c.raw]&&now-S.scan.last[c.raw]<2500)return;S.scan.last[c.raw]=now;
+  const it=itemByCode(c.key);if(it)await apply(it,c);else askNew(c)}
+ (async()=>{try{await loadScriptOnce('html5-qrcode.min.js');if(stopped)return;const F=Html5QrcodeSupportedFormats;
+   $('#scanv').innerHTML='';cam=new Html5Qrcode('scanv',{verbose:false,useBarCodeDetectorIfSupported:true,formatsToSupport:[F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.DATA_MATRIX,F.QR_CODE,F.ITF]});
+   await cam.start({facingMode:'environment'},{fps:12,qrbox:(w,h)=>({width:Math.min(w-20,320),height:Math.min(h-20,170)})},t=>onCode(t,false),()=>{});if(stopped)cam.stop().catch(()=>{})}
+  catch(e){console.warn(e);const v=$('#scanv');if(v)v.innerHTML=`<div class="small muted" style="padding:22px 12px;text-align:center">Caméra indisponible. Autorisez l'accès à la caméra pour cette application dans les réglages du téléphone, ou saisissez le code ci-dessous.</div>`}})();
+ d.addEventListener('close',()=>{stopped=true;try{cam?.stop().catch(()=>{})}catch(e){}S.scan=null},{once:true})}
+
 /* ---- Stock (cabinet et laboratoire) ---- */
 const zoneOf=i=>i.zone||'cabinet';
 const zoneItems=()=>S.stock.filter(i=>zoneOf(i)===(S.stockZone||'cabinet'));
@@ -1127,11 +1193,13 @@ const canStock=()=>(S.stockZone||'cabinet')==='labo'?perm('labo_gerer'):perm('st
 function stockMount(el,embedded){const lab=S.stockZone==='labo';
  el.innerHTML=`<div class="stack">${embedded?'':`<div class="head"><div><h1>Stock du cabinet</h1><div class="muted">Consommables, matériaux et instruments du cabinet.</div></div></div>${banners()}`}
   <div class="row"><input class="inp" id="stq" type="search" placeholder="Rechercher un article" style="flex:1;min-width:180px" value="${esc(S.stockQ)}" aria-label="Rechercher"><button class="btn ghost" data-act="orderList">${ic('cart')}Liste de commande</button></div>
+  ${canStock()?`<div class="row" style="gap:8px"><button class="btn pri big" style="flex:1" data-act="scanIn">${ic('scan')}Scanner une entrée</button><button class="btn ghost big" style="flex:1" data-act="scanOut">${ic('scan')}Scanner une sortie</button></div>`:''}
   <div class="chips" id="stChips"></div><div class="card" style="padding-block:4px" id="stList"></div></div>${canStock()?`<button class="btn pri big fab" data-act="stockEdit" data-id="">${ic('plus')}Article</button>`:''}`;
  $('#stq').addEventListener('input',e=>{S.stockQ=e.target.value;stockUpdate()})}
-function stockRow(i,can){const qte=qtyOf(i);const lo=isLow(i);return `<div class="stk ${lo?'low':''}"><div class="grow" data-act="stockEdit" data-id="${esc(i.id)}"><div style="font-weight:600">${esc(i.nom)} ${lo?'<span class="pill bad">À commander</span>':''}</div>
+function stockRow(i,can){const qte=qtyOf(i);const lo=isLow(i);return `<div class="stk ${lo?'low':''}"><div class="grow" data-act="stockEdit" data-id="${esc(i.id)}"><div style="font-weight:600">${esc(i.nom)} ${lo?'<span class="pill bad">À commander</span>':''}${perPill(i)}</div>
    <div class="small muted">${esc([S.stockFilter===stockCat(i)?'':stockCat(i),i.lieu,i.fournisseur].filter(Boolean).join(', '))}${Number(i.seuil)?`, seuil ${esc(i.seuil)}`:''}</div></div>
    <div class="qty">${can?`<button class="ib" data-act="qty" data-id="${esc(i.id)}" data-n="-1" aria-label="Retirer une unité">${ic('minus')}</button>`:''}<b>${qte}</b>${can?`<button class="ib" data-act="qty" data-id="${esc(i.id)}" data-n="1" aria-label="Ajouter une unité">${ic('plus')}</button>`:''}<span class="small muted" style="min-width:3ch">${esc(i.unite||'')}</span></div></div>`}
+const perPill=i=>{if(!i.peremption||qtyOf(i)<=0)return '';const t=today();const soon=new Date(Date.now()+60*864e5).toISOString().slice(0,10);return i.peremption<t?' <span class="pill bad">Périmé</span>':i.peremption<=soon?` <span class="pill warn">Pér. ${esc(fmtDate(i.peremption,{day:'numeric',month:'short'}))}</span>`:''};
 const secIni=n=>n.replace(/&/g,'').split(/[\s-]+/).filter(w=>w.length>2||/^[A-Z]/.test(w)).slice(0,2).map(w=>w[0].toUpperCase()).join('');
 function stockUpdate(){const L=$('#stList');if(!L)return;const Z=zoneItems();const low=Z.filter(isLow).length;const lab=S.stockZone==='labo';const CATS=lab?LAB_CATS:STOCK_CATS;
   const cats=[...new Set(Z.map(stockCat))].sort((a,b)=>(CATS.indexOf(a)+1||99)-(CATS.indexOf(b)+1||99));const allCats=lab?cats:[...CATS,...cats.filter(c=>!CATS.includes(c))];
@@ -1170,9 +1238,11 @@ function stockEdit(id){const lab=S.stockZone==='labo';const CATS0=lab?LAB_CATS:S
  <label class="f">Seuil d'alerte<input class="inp" type="number" name="seuil" id="st-seuil" min="0" step="1" value="${esc(i.seuil||0)}"></label></div>
  <div class="fgrid"><label class="f">Emplacement<input class="inp" name="lieu" id="st-lieu" placeholder="${lab?'Armoire CFAO, étagère 2…':'Tiroir 3, réserve…'}" value="${esc(i.lieu)}"></label>
  <label class="f">Fournisseur<input class="inp" name="fournisseur" id="st-four" value="${esc(i.fournisseur)}"></label></div>
+ <label class="f">Codes-barres associés<input class="inp" name="codes" id="st-codes" value="${esc((i.codes||[]).join(', '))}" placeholder="Scannez avec « Scanner une entrée » ou saisissez le code" autocomplete="off"></label>
+ ${i.peremption?`<div class="small muted">Péremption du lot le plus proche : ${esc(fmtDate(i.peremption,{day:'numeric',month:'long',year:'numeric'}))}</div>`:''}
  ${i.maj?`<div class="small muted">Dernière mise à jour : ${esc(nameOf(i.par))}, ${new Date(i.maj).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})}</div>`:''}`,
  onOk:async f=>{if(!f.nom.trim()){toast('Indiquez la désignation.','err');return false}
-  const data={nom:f.nom.trim(),cat:f.cat,unite:f.unite.trim(),qte:Math.max(0,Number(f.qte)||0),seuil:Math.max(0,Number(f.seuil)||0),lieu:f.lieu.trim(),fournisseur:f.fournisseur.trim(),maj:Date.now(),par:S.uid};
+  const data={nom:f.nom.trim(),cat:f.cat,unite:f.unite.trim(),qte:Math.max(0,Number(f.qte)||0),seuil:Math.max(0,Number(f.seuil)||0),lieu:f.lieu.trim(),fournisseur:f.fournisseur.trim(),codes:[...new Set(String(f.codes||'').split(/[,;\s]+/).filter(Boolean).map(x=>parseCode(x).key))],maj:Date.now(),par:S.uid};
   delete S.stockLocal[i.id];return i.id?W(()=>S.db.doc('stock/'+i.id).update(data),'Article mis à jour'):W(()=>S.db.collection('stock').add({...data,zone:S.stockZone||'cabinet'}),'Article ajouté')},
  onDel:async()=>{if(!await ask('Supprimer « '+i.nom+' » du stock ?','Supprimer'))return false;return W(()=>S.db.doc('stock/'+i.id).delete(),'Article supprimé')}});
  if(!lab){const sel=$('#st-cat'),nm=$('#st-nom'),un=$('#st-unite');const fill=()=>{$('#dl-stcat').innerHTML=catItems(sel.value).map(x=>`<option value="${esc(x.nom)}">`).join('')};fill();sel.onchange=fill;
@@ -1503,7 +1573,7 @@ const Acts={
   const ok=await W(()=>S.db.doc('messages/'+a.dataset.id).delete());if(ok&&m?.asset&&S.assets){try{await S.assets.delete(m.asset)}catch(e){}}},
  zoom:a=>{openModal({title:'Photo',ok:null,cancel:'Fermer',body:`<img src="${esc(a.getAttribute('src'))}" alt="${esc(a.alt)}" style="width:100%;border-radius:10px">`})},
  stockEdit:a=>{if(perm('stock_edit'))stockEdit(a.dataset.id)},qty:a=>changeQty(a.dataset.id,Number(a.dataset.n)),
- stFilter:a=>{S.stockFilter=a.dataset.k;S.stockQ='';const q=$('#stq');if(q)q.value='';stockUpdate();window.scrollTo(0,0)},stockCatalog:a=>stockCatalog(a.dataset.k),stockLow:()=>{S.stockFilter='bas';go('stock')},orderList,
+ stFilter:a=>{S.stockFilter=a.dataset.k;S.stockQ='';const q=$('#stq');if(q)q.value='';stockUpdate();window.scrollTo(0,0)},stockCatalog:a=>stockCatalog(a.dataset.k),scanIn:()=>{S.scanMode='in';scanModal()},scanOut:()=>{S.scanMode='out';scanModal()},stockLow:()=>{S.stockFilter='bas';go('stock')},orderList,
  caTab:a=>{S.caisseTab=a.dataset.t;go('caisse')},caActivate,reLoad:loadRecettes,
  rePick:a=>{S.reDate=a.dataset.d;const i=$('#reDate');if(i)i.value=a.dataset.d;loadRecettes();window.scrollTo(0,0)},
  reDel:async a=>{if(!await ask('Supprimer cet encaissement ?','Supprimer'))return;if(await W(()=>S.db.doc(`recettes/${a.dataset.u}/e/${a.dataset.id}`).delete(),'Encaissement supprimé'))loadRecettes()},
