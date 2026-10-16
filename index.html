@@ -133,7 +133,7 @@ main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-size:.86rem;cursor:pointer;font-weight:500}
 .chip[aria-pressed="true"]{background:var(--fg);border-color:var(--fg);color:var(--bg)}
-label.f{display:flex;flex-direction:column;gap:6px;font-size:.84rem;font-weight:600;color:var(--muted)}
+label.f{position:relative;display:flex;flex-direction:column;gap:6px;font-size:.84rem;font-weight:600;color:var(--muted)}
 .inp{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:11px 13px;font-size:15px;color:var(--fg);min-width:0;transition:border-color .15s,box-shadow .15s}
 .inp:focus{outline:none;border-color:var(--gold-2);box-shadow:0 0 0 3px var(--accent-soft)}
 textarea.inp{resize:vertical;min-height:90px}
@@ -322,6 +322,9 @@ fieldset.fs{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:1
 .install{display:flex;gap:14px;align-items:center}
 .install img{width:48px;height:48px;border-radius:12px;flex:none}
 .newpat{display:flex;flex-direction:column;gap:10px;padding:12px 14px;border-radius:14px;background:var(--accent-soft);color:var(--fg)}
+.sugg{position:absolute;left:0;right:0;top:100%;margin-top:4px;z-index:60;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.18);max-height:300px;overflow:auto;font-weight:400;color:var(--fg)}
+.sugg[hidden]{display:none}.sugg button{display:flex;width:100%;gap:10px;align-items:center;text-align:left;border:0;background:none;padding:10px 12px;border-bottom:1px solid var(--line);color:inherit;font:inherit;cursor:pointer}
+.sugg button:last-child{border-bottom:0}.sugg button:hover,.sugg button.on{background:var(--accent-soft)}.sugg .t{font-weight:600;font-size:.95rem}.sugg .s{font-size:.8rem;color:var(--muted)}.sugg .avatar{width:32px;height:32px;font-size:.75rem;flex:none}.sugg .none{padding:10px 12px;font-size:.85rem;color:var(--muted)}
 .newpat .fgrid[hidden],.newpat .perm[hidden]{display:none!important}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -670,7 +673,7 @@ function subRdvSel(){S.subs.rdvSel?.();S.rdvSel=[];if(!S.db||!S.uid||!perm('rdv_
 function rdvModal(r){r=r||{date:S.agDate,heure:'',duree:30,statut:'prevu'};const ro=!perm('rdv_gerer');S.patPick={};
  const praticiens=teamMembers().filter(u=>['dentiste','stagiaire'].includes(roleOf(u))).map(nameOf);
  const d=openModal({title:ro?'Rendez-vous':r.id?'Modifier le rendez-vous':'Nouveau rendez-vous',del:r.id&&perm('rdv_suppr')?'Supprimer':null,ok:ro?null:'Enregistrer',cancel:ro?'Fermer':'Annuler',
- body:`<fieldset class="fs" ${ro?'disabled':''}><label class="f">Patient<input class="inp" name="patient" id="rd-patient" required value="${esc(r.patient||'')}" autocomplete="off" list="dl-pat"></label><datalist id="dl-pat"></datalist>
+ body:`<fieldset class="fs" ${ro?'disabled':''}><label class="f">Patient<input class="inp" name="patient" id="rd-patient" required value="${esc(r.patient||'')}" autocomplete="off"></label>
  ${perm('pat_edit')?`<div class="newpat" id="rd-newpat" hidden><div class="small"><b>Nouveau patient :</b> une fiche sera créée dans la liste des patients.</div>
   <div class="fgrid"><label class="f">Nom<input class="inp" name="newNom" id="rd-newnom" autocomplete="off"></label><label class="f">Prénom<input class="inp" name="newPrenom" id="rd-newprenom" autocomplete="off"></label></div>
   <label class="perm" style="border:0;padding:0"><input type="checkbox" name="mkpat" id="rd-mkpat" checked><span>Créer la fiche patient</span></label></div>`:''}
@@ -700,9 +703,27 @@ function rdvModal(r){r=r||{date:S.agDate,heure:'',duree:30,statut:'prevu'};const
   const sp=splitName(v);const n=$('#rd-newnom',d),pr=$('#rd-newprenom',d);if(!n.dataset.touched)n.value=sp.nom;if(!pr.dataset.touched)pr.value=sp.prenom};
  if(NP&&!ro){$('#rd-newnom',d).addEventListener('input',e=>e.target.dataset.touched=1);$('#rd-newprenom',d).addEventListener('input',e=>e.target.dataset.touched=1);
   inp.addEventListener('input',()=>later('rdnew',syncNew,450));inp.addEventListener('change',()=>later('rdnew',syncNew,50));if(inp.value&&!r.patientId)syncNew()}
- if(!ro&&perm('pat_voir'))inp.addEventListener('input',()=>later('rdpat',async()=>{const q=norm(inp.value);if(q.length<2||!S.db)return;
-  try{const s=await S.db.collection('patients').where('cle','>=',q).where('cle','<=',q+'').limit(8).get();
-   $('#dl-pat',d).innerHTML=s.docs.map(x=>{const p={id:x.id,...x.data()};const label=patName(p)+(p.tel?' ('+p.tel+')':'');S.patPick[label]={id:p.id,nom:patName(p),tel:p.tel};return `<option value="${esc(label)}">`}).join('')}catch(e){}},250))}
+ if(!ro&&perm('pat_voir'))patSuggest(inp,p=>{const t=$('#rd-tel',d);if(t&&!t.value.trim()&&p.tel)t.value=p.tel})}
+
+/* ---- Suggestions de patients pendant la saisie ---- */
+async function patCandidates(raw){const q=norm(raw);if(!q||!S.db)return[];const P=S.db.collection('patients');const digits=q.replace(/[\s.\-+]/g,'');
+ const qs=[P.where('cle','>=',q).where('cle','<=',q+'\uf8ff').limit(10).get(),P.where('cle2','>=',q).where('cle2','<=',q+'\uf8ff').limit(10).get()];
+ if(/^\d{3,}$/.test(digits))qs.push(P.where('telN','>=',digits).where('telN','<=',digits+'\uf8ff').limit(10).get());
+ const snaps=await Promise.all(qs);const seen=new Set(),res=[];snaps.forEach(s=>s.docs.forEach(d=>{if(!seen.has(d.id)){seen.add(d.id);res.push({id:d.id,...d.data()})}}));
+ return res.sort((a,b)=>patName(a).localeCompare(patName(b),'fr')).slice(0,12)}
+function patSuggest(inp,onPick){if(!inp)return;S.patPick=S.patPick||{};const box=document.createElement('div');box.className='sugg';box.hidden=true;box.setAttribute('role','listbox');inp.after(box);
+ inp.setAttribute('autocomplete','off');inp.removeAttribute('list');let items=[],sel=-1,tok=0;
+ const close=()=>{box.hidden=true;sel=-1};
+ const pick=p=>{const label=patName(p)+(p.tel?' ('+p.tel+')':'');S.patPick[label]={id:p.id,nom:patName(p),tel:p.tel||''};inp.value=label;close();onPick&&onPick(p);inp.dispatchEvent(new Event('change'))};
+ const draw=()=>{box.innerHTML=items.length?items.map((p,i)=>`<button type="button" data-i="${i}" class="${i===sel?'on':''}"><span class="avatar">${esc(initials(p))}</span><span style="min-width:0"><div class="t">${esc(patName(p))}</div><div class="s">${esc([ageOf(p.naissance),p.tel].filter(Boolean).join(', ')||'Aucune coordonnée')}</div></span></button>`).join('')
+  :'<div class="none">Aucun patient trouvé — une nouvelle fiche sera proposée.</div>';box.hidden=false};
+ const run=async()=>{const v=inp.value.trim();if(!v||S.patPick[v]){close();return}const t=++tok;let r=[];try{r=await patCandidates(v)}catch(e){console.warn(e);return}
+  if(t!==tok||inp.value.trim()!==v||document.activeElement!==inp)return;items=r;sel=-1;draw()};
+ inp.addEventListener('input',()=>later('sugg'+inp.id,run,180));inp.addEventListener('focus',()=>{if(inp.value.trim()&&!S.patPick[inp.value.trim()])run()});
+ inp.addEventListener('blur',()=>setTimeout(close,200));
+ box.addEventListener('pointerdown',e=>e.preventDefault());
+ box.addEventListener('click',e=>{const b=e.target.closest('button[data-i]');if(b)pick(items[+b.dataset.i])});
+ inp.addEventListener('keydown',e=>{if(box.hidden||!items.length)return;if(e.key==='ArrowDown'){sel=Math.min(items.length-1,sel+1);draw();e.preventDefault()}else if(e.key==='ArrowUp'){sel=Math.max(0,sel-1);draw();e.preventDefault()}else if(e.key==='Enter'&&sel>=0){pick(items[sel]);e.preventDefault()}else if(e.key==='Escape'){close()}})}
 
 /* ---- Patients ---- */
 const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
@@ -1172,7 +1193,7 @@ function labModal(c){const tab=c?.section||S.labTab||'fixe';const sec=LAB[tab];c
  const praticiens=teamMembers().filter(u=>['dentiste','stagiaire','prothesiste'].includes(roleOf(u))).map(nameOf);
  const labs=[...new Set(S.labo.map(x=>x.laboExt).filter(Boolean))];
  const d=openModal({title:(c.id?(ro?'':'Modifier : '):'Nouveau : ')+sec.nom,ok:ro?null:'Enregistrer',cancel:ro?'Fermer':'Annuler',del:c.id&&!ro?'Supprimer':null,
- body:`<fieldset class="fs" ${ro?'disabled':''}><label class="f">Patient<input class="inp" name="patient" id="lb-pat" list="dl-lpat" value="${esc(c.patient||'')}" autocomplete="off" required></label><datalist id="dl-lpat"></datalist>
+ body:`<fieldset class="fs" ${ro?'disabled':''}><label class="f">Patient<input class="inp" name="patient" id="lb-pat" value="${esc(c.patient||'')}" autocomplete="off" required></label>
   <div class="fgrid"><label class="f">Travail<input class="inp" name="travail" id="lb-trav" list="dl-trav" value="${esc(c.travail||'')}" required></label><label class="f">${tab==='aligneurs'?'Arcade(s)':'Dent(s)'}<input class="inp" name="dents" id="lb-dents" value="${esc(c.dents||'')}" placeholder="${tab==='aligneurs'?'Maxillaire et mandibule':'14, 15, 16'}"></label></div>
   <div class="fgrid">${tab!=='aligneurs'?`<label class="f">Teinte<input class="inp" name="teinte" id="lb-teinte" list="dl-teinte" value="${esc(c.teinte||'')}"></label>`:`<label class="f">Nombre d'aligneurs<input class="inp" type="number" min="0" name="nb" id="lb-nb" value="${esc(c.nb||'')}"></label>`}
    <label class="f">Matériau<input class="inp" name="materiau" id="lb-mat" list="dl-mat" value="${esc(c.materiau||'')}"></label></div>
@@ -1193,9 +1214,7 @@ function labModal(c){const tab=c?.section||S.labTab||'fixe';const sec=LAB[tab];c
   return W(()=>S.db.collection('labo').add({...data,photos:[],historique:[{s:f.statut,ts:Date.now(),by:S.uid}],cree:Date.now(),creePar:S.uid}),'Travail ajouté')},
  onDel:async()=>{if(!await ask('Supprimer ce travail et ses photos ?','Supprimer'))return false;const ok=await W(()=>S.db.doc('labo/'+c.id).delete(),'Travail supprimé');
   if(ok&&S.assets)for(const a of c.photos||[]){try{await S.assets.delete(a)}catch(e){}}return ok}});
- const inp=$('#lb-pat',d);if(!ro&&perm('pat_voir'))inp.addEventListener('input',()=>later('lbpat',async()=>{const q=norm(inp.value);if(q.length<2||!S.db)return;
-  try{const s=await S.db.collection('patients').where('cle','>=',q).where('cle','<=',q+'').limit(8).get();
-   $('#dl-lpat',d).innerHTML=s.docs.map(x=>{const p={id:x.id,...x.data()};const label=patName(p)+(p.tel?' ('+p.tel+')':'');S.patPick[label]={id:p.id,nom:patName(p)};return `<option value="${esc(label)}">`}).join('')}catch(e){}},250))}
+ const inp=$('#lb-pat',d);if(!ro&&perm('pat_voir'))patSuggest(inp)}
 $('#labfile').addEventListener('change',async e=>{const files=[...e.target.files];e.target.value='';const id=S.labUpId;const c=S.labo.find(x=>x.id===id);if(!files.length||!c||!S.assets)return;
  const ids=[];let n=0;for(const file of files){n++;toast(`Envoi ${n} sur ${files.length}…`);try{const blob=await compressImg(file,2000,.86);const up=await S.assets.upload(blob,{type:'image/jpeg'});ids.push(up.id)}catch(err){console.warn(err);toast(errMsg(err),'err');break}}
  if(!ids.length)return;const cur=(S.labo.find(x=>x.id===id)?.photos)||[];await W(()=>S.db.doc('labo/'+id).update({photos:[...cur,...ids],maj:Date.now(),par:S.uid}),ids.length>1?ids.length+' photos ajoutées':'Photo ajoutée')});
@@ -1225,9 +1244,10 @@ Views.caisse={
   $('#caForm').onsubmit=async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const mt=Number(String(f.montant).replace(',','.'));
    if(!(mt>0)){toast('Indiquez un montant valide.','err');return}if(!S.uid){toast('Identité indisponible : saisie impossible.','err');return}
    const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
-   try{const enc=await encryptFor(S.cfg.caisse.pub,{montant:mt,mode:f.mode,patient:f.patient.trim(),acte:f.acte.trim(),note:f.note.trim()});
+   try{const enc=await encryptFor(S.cfg.caisse.pub,{montant:mt,mode:f.mode,patient:(S.patPick?.[f.patient]?.nom||f.patient).trim(),acte:f.acte.trim(),note:f.note.trim()});
     const ok=await W(()=>S.db.collection(`recettes/${S.uid}/e`).add({date:today(),mois:today().slice(0,7),ts:Date.now(),enc}),'Encaissement enregistré');
-    if(ok)e.target.reset()}catch(err){console.warn(err);toast('Chiffrement impossible sur cet appareil.','err')}finally{btn.disabled=false}}},
+    if(ok){e.target.reset();S.patPick={}}}catch(err){console.warn(err);toast('Chiffrement impossible sur cet appareil.','err')}finally{btn.disabled=false}};
+  if(perm('pat_voir'))patSuggest($('#ca-pat'))},
  update(){const i=$('#caInfo');if(i)i.textContent=S.myRecCount?`Vous avez enregistré ${S.myRecCount} encaissement${S.myRecCount>1?'s':''} aujourd'hui.`:'Aucun encaissement enregistré par vous aujourd\'hui.'}};
 async function encryptFor(pubJwk,obj){const pub=await crypto.subtle.importKey('jwk',pubJwk,{name:'RSA-OAEP',hash:'SHA-256'},false,['encrypt']);
  const k=await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt']);const iv=crypto.getRandomValues(new Uint8Array(12));
