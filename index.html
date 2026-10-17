@@ -194,8 +194,13 @@ td.r,th.r{text-align:right}
 .rdv .h{font-family:var(--f-display);font-weight:600;font-size:1rem}
 .rdv .h small{display:block;color:var(--muted);font-size:.74rem;font-family:var(--f-body);font-weight:400}
 .rdv .grow{min-width:0;cursor:pointer}
+.rdv{border-left:4px solid var(--tc,transparent);padding-left:10px!important}
+.stag{display:inline-block;font-size:.7rem;font-weight:600;padding:1px 8px;border-radius:9px;color:#fff;background:var(--tc);vertical-align:2px;margin-left:4px}
+.legend{display:flex;gap:6px 12px;overflow-x:auto;scrollbar-width:none;padding:2px 0;font-size:.74rem;color:var(--muted);white-space:nowrap}.legend::-webkit-scrollbar{display:none}
+.legend .lg{display:inline-flex;align-items:center;gap:5px}.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
 .rdv{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;transition:background .2s}.rdv.pressing{background:var(--accent-soft);border-radius:12px}
 .alprog{display:flex;flex-direction:column;gap:6px;margin:8px 0 2px}.alprog .bar{height:6px;border-radius:9px;background:var(--line);overflow:hidden}.alprog .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold-1),var(--gold-2))}
+.site-lock{display:flex;gap:10px;align-items:center}.site-lock>svg{width:22px;height:22px;flex:none}
 .menu-list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .menu-it{display:flex;align-items:center;gap:12px;padding:14px;border:0;border-bottom:1px solid var(--line);background:var(--surface);font:inherit;font-weight:600;color:var(--fg);cursor:pointer;text-align:left}
 .menu-it:last-child{border-bottom:0}.menu-it span{flex:1}.menu-it svg{width:20px;height:20px;color:var(--gold-2)}.menu-it svg:last-child{color:var(--muted);width:16px}.menu-it:hover{background:var(--accent-soft)}
@@ -432,11 +437,44 @@ const ic=(n,cls)=>`<svg ${cls?`class="${cls}"`:''} viewBox="0 0 24 24" fill="non
 
 /* ---------- reference data ---------- */
 const ROLES={dentiste:'Dentiste',assistante:'Assistante dentaire',secretaire:'Secrétaire / Accueil',prothesiste:'Prothésiste',stagiaire:'Stagiaire',autre:'Autre'};
+/* ---- Types de soins (couleurs de l'agenda) ---- */
+const DEF_SOINS=[{id:'consult',nom:'Consultation / contrôle',c:'#6B8FB5'},{id:'urgence',nom:'Urgence',c:'#D9534F'},{id:'paro',nom:'Détartrage / parodontologie',c:'#4FA3A5'},
+ {id:'cons',nom:'Soins conservateurs',c:'#5B9BD5'},{id:'endo',nom:'Endodontie',c:'#8E6BB8'},{id:'pfixe',nom:'Prothèse fixe',c:'#C9A227'},{id:'pamov',nom:'Prothèse amovible',c:'#B7895A'},
+ {id:'chir',nom:'Chirurgie / extraction',c:'#C0392B',chir:true},{id:'implant',nom:'Implantologie',c:'#7A1F3D',chir:true},{id:'ortho',nom:'Orthodontie',c:'#2E8B57'},
+ {id:'align',nom:'Aligneurs',c:'#3CB371'},{id:'esth',nom:'Esthétique / blanchiment',c:'#E07BA6'},{id:'pedo',nom:'Pédodontie',c:'#F0A030'}];
+const soinTypes=()=>(S.cfg?.soins?.liste?.length?S.cfg.soins.liste:DEF_SOINS);
+const soinOf=r=>soinTypes().find(t=>t.id===r?.type)||null;
+const soinTag=r=>{const t=soinOf(r);return t?` <span class="stag" style="--tc:${esc(t.c)}">${esc(t.nom)}</span>`:''};
+const rdvLong=r=>Number(r.duree)>60||!!soinOf(r)?.chir;
+function soinLegend(){return soinTypes().map(t=>`<span class="lg"><i style="background:${esc(t.c)}"></i>${esc(t.nom)}</span>`).join('')}
+function soinTypesEdit(){if(!S.isOwner)return;const L=soinTypes().map(t=>({...t}));
+ const row=(t,k)=>`<div class="row st-row" style="gap:8px;align-items:center"><input type="color" class="inp" name="c${k}" value="${esc(t.c)}" style="width:46px;padding:2px;height:40px"><input class="inp" name="n${k}" value="${esc(t.nom)}" style="flex:1;min-width:120px" placeholder="Nom du soin"><label class="small" style="display:flex;gap:4px;align-items:center;white-space:nowrap"><input type="checkbox" name="x${k}" ${t.chir?'checked':''}>Chirurgie</label><input type="hidden" name="i${k}" value="${esc(t.id)}"></div>`;
+ const d=openModal({title:'Types de soins',body:`<div class="small muted">Chaque rendez-vous doit avoir un type. La couleur s'affiche dans l'agenda. Les types « Chirurgie » déclenchent un rappel la veille, comme les séances de plus d'une heure. Videz un nom pour supprimer le type.</div>
+  <div class="stack" style="gap:8px" id="stList">${L.map(row).join('')}</div><button type="button" class="btn ghost" id="stAdd" style="align-self:flex-start">${ic('plus')}Ajouter un type</button>`,
+  onOk:f=>{const out=[];for(let k=0;k<200;k++){if(!(('n'+k) in f))continue;const nom=String(f['n'+k]).trim();if(!nom)continue;out.push({id:f['i'+k]||('t'+Date.now().toString(36)+k),nom,c:f['c'+k]||'#999999',...(f['x'+k]?{chir:true}:{})})}
+   if(!out.length){toast('Gardez au moins un type.','err');return false}return W(()=>S.db.doc('cfg/soins').set({liste:out}),'Types de soins enregistrés')}});
+ let n=L.length;$('#stAdd',d).onclick=()=>{$('#stList',d).insertAdjacentHTML('beforeend',row({id:'',nom:'',c:'#888888'},n++))}}
 const STATUTS={prevu:'Prévu',confirme:'Confirmé',arrive:'En salle d\'attente',encours:'En soin',termine:'Terminé',absent:'Absent',annule:'Annulé'};
 const STATUT_CLS={prevu:'',confirme:'acc',arrive:'warn',encours:'warn',termine:'ok',absent:'bad',annule:'bad'};
 const ACTES=['Consultation','Urgence','Détartrage','Composite','Traitement endodontique','Extraction','Pose d\'implant','Empreinte prothèse','Essayage prothèse','Pose couronne / bridge','Séance aligneurs','Contrôle orthodontie','Pose appareil orthodontique','Blanchiment','Contrôle post-opératoire'];
 const MODES={especes:'Espèces',carte:'Carte bancaire',cheque:'Chèque',virement:'Virement'};
-const LAB_CATS=['Zircone','Disilicate de lithium','Céramique','Résines et PMMA','Résines d\'impression 3D','Plâtres et revêtements','Cires','Dents prothétiques','Alliages','Feuilles de thermoformage','Fraises CFAO','Consommables labo'];
+const LAB_SECTIONS=[
+ {n:'Zircone',d:'Disques et blocs',a:['Disque zircone multicouche A1 98×14|disque','Disque zircone multicouche A2 98×14|disque','Disque zircone multicouche A3 98×14|disque','Disque zircone multicouche A2 98×18|disque','Disque zircone multicouche BL 98×14|disque','Disque zircone haute translucidité A2|disque','Disque zircone haute résistance (bridges)|disque','Liquides de coloration zircone|flacon','Liquide d\'effet incisal|flacon']},
+ {n:'Disilicate de lithium',d:'Blocs et pastilles',a:['Blocs disilicate HT A1|boîte','Blocs disilicate HT A2|boîte','Blocs disilicate LT A2|boîte','Blocs disilicate LT A3|boîte','Pastilles pressées HT A2|boîte','Pastilles pressées LT A3|boîte','Pâte de cristallisation|seringue']},
+ {n:'Céramique',d:'Stratification, maquillage, glaçure',a:['Poudre dentine A1|flacon','Poudre dentine A2|flacon','Poudre dentine A3|flacon','Poudre émail|flacon','Poudre incisale / translucide|flacon','Céramique épaulement|flacon','Opaque|flacon','Maquillants (stains)|flacon','Glaçure|flacon','Liquide de modelage|flacon','Pâte de cuisson (support)|seringue','Pinceaux céramique|pièce']},
+ {n:'Résines et PMMA',d:'Provisoires, bases de prothèse',a:['Disque PMMA A2 98×20|disque','Disque PMMA A3 98×20|disque','Disque PMMA rose (base)|disque','Disque cire usinable|disque','Résine thermopolymérisable (base)|kg','Résine autopolymérisable rose|kg','Résine autopolymérisable transparente|kg','Monomère|flacon','Résine flexible (injection)|cartouche','Résine pour porte-empreinte individuel|plaque']},
+ {n:'Résines d\'impression 3D',d:'Imprimante et post-traitement',a:['Résine modèles|flacon','Résine guides chirurgicaux|flacon','Résine provisoires (C&B)|flacon','Résine gouttières|flacon','Résine base de prothèse|flacon','Résine dents de prothèse|flacon','Résine calcinable|flacon','Résine gencive (modèle)|flacon','Alcool isopropylique|bidon','Films de bac (FEP)|pièce','Bacs de résine|pièce']},
+ {n:'Plâtres et revêtements',d:'Modèles et coulée',a:['Plâtre extra-dur classe IV|sac','Plâtre dur classe III|sac','Plâtre d\'articulateur|sac','Plâtre de socle|sac','Revêtement à liant phosphate|sac','Liquide de revêtement|flacon','Isolant plâtre / résine|flacon','Durcisseur de modèle|flacon','Pins pour modèles|boîte','Plaques de socle|pièce']},
+ {n:'Cires',d:'Modelage et montage',a:['Cire de modelage|boîte','Cire rose en plaques|boîte','Cire de collet|pot','Cire à couler (tiges)|boîte','Cire d\'immersion|pot','Bourrelets d\'occlusion préformés|boîte','Cire collante|boîte']},
+ {n:'Dents prothétiques',d:'Dents du commerce',a:['Dents antérieures maxillaires|plaquette','Dents antérieures mandibulaires|plaquette','Dents postérieures maxillaires|plaquette','Dents postérieures mandibulaires|plaquette','Dents composite haute résistance|plaquette']},
+ {n:'Alliages',d:'Coulée et frittage',a:['Alliage cobalt-chrome (stellite)|kg','Alliage céramo-métallique|kg','Alliage précieux|g','Disque cobalt-chrome fritté|disque','Disque titane|disque','Creusets|pièce','Fils de coulée|pièce']},
+ {n:'Feuilles de thermoformage',d:'Aligneurs et gouttières',a:['Feuilles aligneurs 0,75 mm|boîte','Feuilles aligneurs 0,76 mm multicouche|boîte','Feuilles 1 mm (contention)|boîte','Feuilles 1,5 mm (gouttière)|boîte','Feuilles souples (protège-dents)|boîte','Feuilles de blanchiment|boîte','Feuilles bicouches (bruxisme)|boîte']},
+ {n:'Fraises CFAO',d:'Usineuse et outils',a:['Fraises usinage zircone Ø2|pièce','Fraises usinage zircone Ø1|pièce','Fraises usinage zircone Ø0,6|pièce','Fraises usinage PMMA / cire|pièce','Fraises usinage disilicate|pièce','Fraises usinage titane / CoCr|pièce','Liquide de refroidissement usineuse|bidon','Filtres usineuse|pièce']},
+ {n:'Implantologie (laboratoire)',d:'Pièces prothétiques sur implant',a:['Analogues d\'implant|pièce','Bases titane (Ti-base)|pièce','Vis de laboratoire|pièce','Vis prothétiques|pièce','Piliers calcinables|pièce','Scanbodies de laboratoire|pièce','Analogues pour modèle imprimé|pièce']},
+ {n:'Finition et polissage',d:'Pièce à main et sablage',a:['Fraises tungstène labo|pièce','Fraises diamantées labo|pièce','Meulettes céramique / zircone|pièce','Polissoirs caoutchouc|pièce','Brossettes de polissage|pièce','Pâte à polir zircone|pot','Pâte à polir résine|pot','Pierre ponce|kg','Disques à séparer|pièce','Oxyde d\'alumine 50 µm (sablage)|kg','Oxyde d\'alumine 110 µm (sablage)|kg','Billes de verre (sablage)|kg']},
+ {n:'Consommables labo',d:'Divers atelier',a:['Gants nitrile|boîte','Masques|boîte','Spatules|pièce','Bols à plâtre|pièce','Papier d\'occlusion|boîte','Vaseline / isolant|pot','Colle cyanoacrylate|tube','Sachets de livraison|paquet','Boîtes de livraison prothèse|pièce','Étiquettes|rouleau','Désinfectant empreintes et prothèses|bidon']}
+];
+const LAB_CATS=LAB_SECTIONS.map(s=>s.n);
 /* ---- Catalogue du stock du cabinet : sections et articles courants ---- */
 const STOCK_SECTIONS=[
  {n:'Protection du personnel',d:'Gants, masques, blouses, lunettes',a:['Gants nitrile S|boîte','Gants nitrile M|boîte','Gants nitrile L|boîte','Gants latex|boîte','Gants chirurgicaux stériles 6,5|paire','Gants chirurgicaux stériles 7|paire','Gants chirurgicaux stériles 7,5|paire','Gants de ménage (nettoyage)|paire','Masques chirurgicaux type IIR|boîte','Masques FFP2|boîte','Visières de protection|pièce','Lunettes de protection|pièce','Lunettes de protection patient|pièce','Charlottes|paquet','Surchaussures|paquet','Blouses jetables|paquet','Tabliers plastique|paquet']},
@@ -468,7 +506,8 @@ const STOCK_SECTIONS=[
 const STOCK_CATS=STOCK_SECTIONS.map(s=>s.n);
 const STOCK_ALIAS={'Consommables':'Consommables de soins','Restauration':'Odontologie conservatrice','Prothèse':'Prothèse fixe & empreintes','Chirurgie':'Chirurgie orale','Hygiène & stérilisation':'Stérilisation','Radiologie':'Radiologie & imagerie','Bureau':'Accueil & bureau'};
 const stockCat=i=>{const c=i.cat||'Autre';return zoneOf(i)==='labo'?c:(STOCK_ALIAS[c]||c)};
-const stockSec=n=>STOCK_SECTIONS.find(s=>s.n===n);
+const zoneSecs=()=>(S.stockZone==='labo'?LAB_SECTIONS:STOCK_SECTIONS);
+const stockSec=n=>zoneSecs().find(s=>s.n===n);
 const catItems=n=>(stockSec(n)?.a||[]).map(x=>{const[nom,unite]=x.split('|');return{nom,unite:unite||''}});
 const DEF_GROUPS=[
  {id:'general',nom:'Général',desc:'Annonces et organisation du cabinet'},
@@ -511,16 +550,19 @@ const lastSeen=ls.get('ns_seen',{});
 const groups=()=>(S.cfg.groupes?.liste?.length?S.cfg.groupes.liste:DEF_GROUPS);
 const templates=()=>(S.cfg.checklists?.liste?.length?S.cfg.checklists.liste:DEF_CL);
 const reglement=()=>(S.cfg.reglement?.articles?.length?S.cfg.reglement.articles:DEF_REGLEMENT);
-const MODULES=[['rdv_voir','Agenda'],['pat_voir','Dossiers patients'],['labo_voir','Laboratoire'],['mod_groupes','Groupes de discussion'],['mod_checklists','Checklists'],['mod_stock','Stock du cabinet'],['caisse','Caisse (saisie des encaissements)'],['mod_pointage','Pointage'],['mod_reglement','Règlement intérieur']];
-const ACTIONS=[['rdv_gerer','Ajouter et modifier des rendez-vous'],['rdv_suppr','Supprimer des rendez-vous'],['pat_edit','Créer et modifier les fiches patients'],['pat_docs','Ajouter des radios et des photos'],['pat_suppr','Supprimer des patients et des fichiers'],['stock_edit','Modifier le stock du cabinet'],['labo_gerer','Créer et suivre les travaux du laboratoire, gérer son stock']];
+const MODULES=[['rdv_voir','Agenda complet'],['rdv_jour','Rendez-vous du jour uniquement (photos, radios, soins, notes)'],['pat_voir','Dossiers patients'],['labo_voir','Laboratoire'],['mod_groupes','Groupes de discussion'],['mod_checklists','Checklists'],['mod_stock','Stock du cabinet'],['caisse','Caisse (saisie des encaissements, sans voir les totaux)'],['mod_pointage','Pointage'],['mod_reglement','Règlement intérieur']];
+const ACTIONS=[['rdv_gerer','Ajouter et modifier des rendez-vous'],['rdv_suppr','Supprimer des rendez-vous'],['pat_edit','Créer et modifier les fiches patients'],['pat_docs','Ajouter des radios et des photos'],['pat_suppr','Supprimer des patients et des fichiers'],['stock_edit','Modifier le stock du cabinet'],['labo_gerer','Créer et suivre les travaux du laboratoire, gérer son stock'],['caisse_edit','Corriger ses encaissements du jour (sans voir les totaux)']];
 const PERMS=[...MODULES,...ACTIONS];
 const DEF_ON=['mod_groupes','mod_checklists','mod_stock','mod_pointage','mod_reglement'];
-const PRESETS={dentiste:['rdv_voir','rdv_gerer','rdv_suppr','pat_voir','pat_edit','pat_docs','stock_edit','labo_voir','labo_gerer'],assistante:['rdv_voir','pat_voir','pat_docs','stock_edit','labo_voir'],
- secretaire:['rdv_voir','rdv_gerer','pat_voir','pat_edit','caisse'],prothesiste:['pat_voir','labo_voir','labo_gerer'],stagiaire:['rdv_voir','pat_voir'],autre:[]};
+const PRESETS={dentiste:['rdv_voir','rdv_gerer','rdv_suppr','pat_voir','pat_edit','pat_docs','stock_edit','labo_voir','labo_gerer'],assistante:['rdv_jour','stock_edit'],
+ secretaire:['rdv_voir','rdv_gerer','pat_voir','pat_edit','caisse','caisse_edit'],prothesiste:['pat_voir','labo_voir','labo_gerer'],stagiaire:['rdv_voir','pat_voir'],autre:[]};
 const presetPerms=r=>{const o={};PERMS.forEach(([k])=>o[k]=(PRESETS[r]||[]).includes(k)||DEF_ON.includes(k));return o};
 const memberOf=u=>S.membres[u]||null;
 const statutOf=u=>memberOf(u)?.statut||'attente';
-const perm=p=>{if(S.isOwner)return true;const m=memberOf(S.uid);if(!m||m.statut!=='actif')return false;const v=m.perms?.[p];return v===undefined?DEF_ON.includes(p):!!v};
+const rawPerm=p=>{if(S.isOwner)return true;const m=memberOf(S.uid);if(!m||m.statut!=='actif')return false;const v=m.perms?.[p];return v===undefined?DEF_ON.includes(p):!!v};
+/* Hors du cabinet (GPS), seuls les groupes de discussion restent accessibles. Le compte du Docteur n'est jamais limité. */
+const siteLock=()=>!S.isOwner&&S.cfg?.cabinet?.lat!=null&&S.site!=='in';
+const perm=p=>rawPerm(p)&&(p==='mod_groupes'||!siteLock());
 const myGroups=()=>{if(S.isOwner)return groups();const g=memberOf(S.uid)?.groupes;return Array.isArray(g)?groups().filter(x=>g.includes(x.id)):groups()};
 const roleOf=u=>(u===S.uid&&S.isOwner)?'dentiste':(memberOf(u)?.role||'');
 const teamMembers=()=>members().filter(u=>(u===S.uid&&S.isOwner)||statutOf(u)==='actif');
@@ -587,7 +629,7 @@ function ask(msg,yes){return new Promise(res=>{const d=$('#ask');
 /* ---------- navigation ---------- */
 const NAV=[
  {id:'accueil',lbl:'Accueil',ic:'home',bar:1},
- {id:'agenda',lbl:'Agenda',ic:'cal',bar:1,short:'Agenda',show:()=>perm('rdv_voir')},
+ {id:'agenda',lbl:'Agenda',ic:'cal',bar:1,short:'Agenda',show:()=>perm('rdv_voir')||perm('rdv_jour')},
  {id:'patients',lbl:'Patients',ic:'folder',bar:1,short:'Patients',show:()=>perm('pat_voir')},
  {id:'groupes',lbl:'Groupes',ic:'chat',bar:1,short:'Groupes',show:()=>perm('mod_groupes')},
  {id:'checklists',lbl:'Checklists',ic:'check',bar:1,short:'Checklists',show:()=>perm('mod_checklists')},
@@ -634,8 +676,8 @@ async function pointer(){
  if(!S.uid){toast('Votre identité n\'est pas disponible : ouvrez la page connecté à votre compte.','err');return}
  const cab=S.cfg.cabinet;let loc=null;
  if(cab?.lat!=null&&!S.isOwner){toast('Vérification de votre position…');let c;try{c=await getPos()}catch(e){toast(geoErr(e),'err');return}
-  const d=Math.round(distM(cab,{lat:c.latitude,lng:c.longitude})),acc=Math.round(c.accuracy||0),R=Number(cab.rayon)||150;
-  if(d-Math.min(acc,100)>R){toast(`Pointage impossible : vous êtes à ${d>=1000?(d/1000).toFixed(1)+' km':d+' m'} du cabinet. Le pointage se fait uniquement au cabinet.`,'err');return}
+  const d=Math.round(distM(cab,{lat:c.latitude,lng:c.longitude})),acc=Math.round(c.accuracy||0),R=Number(cab.rayon)||10;
+  if(d-Math.min(acc,SITE_TOL)>R){toast(`Pointage impossible : vous êtes à ${d>=1000?(d/1000).toFixed(1)+' km':d+' m'} du cabinet. Le pointage se fait uniquement au cabinet.`,'err');return}
   loc={d,acc}}
  const st=ptState(S.myPointage);const sess=st.sessions.map(x=>({...x}));let msg;
  if(st.inside){const l=sess[sess.length-1];l.out=Date.now();if(loc)l.outLoc=loc;msg='Départ enregistré à '+nowHM()}else{sess.push({in:Date.now(),out:null,...(loc?{inLoc:loc}:{})});msg='Arrivée enregistrée à '+nowHM()}
@@ -658,7 +700,7 @@ Views.accueil={update(el){
  const st=ptState(S.myPointage);
  const rdvs=S.rdvToday.filter(r=>r.statut!=='annule').sort((a,b)=>(a.heure||'').localeCompare(b.heure||''));
  const upcoming=rdvs.filter(r=>!['termine','absent'].includes(r.statut)&&(r.heure||'')>=nowHM()).slice(0,5);
- const low=S.stock.filter(isLow);
+ const low=S.stock.filter(i=>zoneOf(i)==='cabinet'&&isLow(i));
  const doneTpl=id=>S.execToday.find(x=>x.tpl===id&&x.fin);
  const h=new Date().getHours();const hi=h<12?'Bonjour':h<18?'Bon après-midi':'Bonsoir';
  const mods=NAV.filter(n=>n.id!=='accueil'&&(!n.show||n.show()));
@@ -676,7 +718,7 @@ Views.accueil={update(el){
  <nav class="tiles" aria-label="Modules" style="--cols:${mods.length%4===0?4:mods.length%5===0?5:mods.length%3===0?3:4};--colsd:${mods.length}">${mods.map(n=>{const u=n.id==='groupes'?totalUnread():0;const sh=typeof n.short==='function'?n.short():n.short;
   return `<button class="mtile" data-go="${n.id}"><span class="gold">${ic(icn(n))}</span><span>${esc(sh)}</span>${u?`<span class="badge">${u}</span>`:''}</button>`}).join('')}</nav>
  <div class="grid2">
-  ${perm('rdv_voir')?`<section class="card">
+  ${(perm('rdv_voir')||perm('rdv_jour'))?`<section class="card">
    <div class="card-h"><h3>Rendez-vous du jour</h3><span class="sp"></span><button class="btn ghost" data-go="agenda">${ic('cal')}Agenda</button></div>
    <div class="mini-kpis"><div class="kpi"><b>${rdvs.length}</b><span class="small muted">prévus</span></div><div class="kpi"><b>${rdvs.filter(r=>r.statut==='termine').length}</b><span class="small muted">terminés</span></div><div class="kpi"><b>${rdvs.filter(r=>['arrive','encours'].includes(r.statut)).length}</b><span class="small muted">au cabinet</span></div></div>
    <div class="list">${upcoming.length?upcoming.map(r=>`<div class="li"><span class="timechip">${esc(r.heure||'')}</span><div class="grow"><div class="t">${esc(r.patient||'Patient')}</div><div class="s">${esc(r.acte||'')}</div></div><span class="pill ${STATUT_CLS[r.statut]||''}">${esc(STATUTS[r.statut]||'Prévu')}</span></div>`).join(''):`<div class="small muted" style="padding-block:8px">Plus aucun rendez-vous à venir aujourd'hui.</div>`}</div>
@@ -686,6 +728,9 @@ Views.accueil={update(el){
     <div class="card-h"><h3>Ouverture et fermeture</h3></div>
     <div class="list">${['ouverture','fermeture'].map(id=>{const t=templates().find(x=>x.id===id);const d=doneTpl(id);if(!t)return '';return `<div class="li"><div class="grow"><div class="t">${esc(t.nom)}</div><div class="s">${d?`Faite par ${esc(nameOf(d.by))} à ${hm(d.fin)}`:'À faire aujourd\'hui'}</div></div>${d?'<span class="pill ok">Faite</span>':`<button class="btn pri" data-act="startTpl" data-id="${id}">Commencer</button>`}</div>`}).join('')}</div>
    </section>`:''}
+   ${(()=>{const T=(S.rdvTomorrow||[]).filter(r=>r.statut!=='annule'&&rdvLong(r)).sort((a,b)=>(a.heure||'').localeCompare(b.heure||''));if(!T.length)return '';
+    return `<section class="card" style="border-color:var(--warn,#c9a227)"><div class="card-h"><h3>Demain : séances à préparer</h3></div><div class="small muted" style="margin-bottom:6px">Séances de plus d'une heure ou chirurgicales.</div>
+    <div class="list">${T.map(r=>`<div class="li"><span class="timechip">${esc(r.heure||'')}</span><div class="grow"><div class="t">${esc(r.patient||'Patient')}${soinTag(r)}</div><div class="s">${esc([r.acte,r.duree?r.duree+' min':'',r.praticien].filter(Boolean).join(' · '))}</div></div></div>`).join('')}</div></section>`})()}
    ${perm('labo_voir')&&S.labo.some(alDueSoon)?(()=>{const L=S.labo.filter(alDueSoon).sort((a,b)=>a.alProchain<b.alProchain?-1:1);return `<section class="card">
     <div class="card-h"><h3>Aligneurs à remettre</h3><span class="sp"></span><button class="btn ghost" data-act="alVoir">Voir</button></div>
     <div class="list">${L.slice(0,6).map(c=>`<div class="li" style="cursor:pointer" data-act="labOpen" data-id="${esc(c.id)}"><div class="grow"><div class="t">${esc(c.patient||'Patient')}</div><div class="s">Aligneur ${(Number(c.alActuel)||0)+1} sur ${esc(c.nb)}</div></div>${alPill(c).replace(/Aligneur \d+ : /,'')}</div>`).join('')}</div></section>`})():''}
@@ -698,7 +743,25 @@ Views.accueil={update(el){
  ${perm('mod_groupes')&&myGroups().length?`<section class="card"><div class="card-h"><h3>Groupes</h3></div><div class="list">${myGroups().map(g=>{const n=unreadOf(g.id);const last=S.latest.find(m=>m.groupe===g.id);return `<div class="li" style="cursor:pointer" data-act="openGroup" data-id="${esc(g.id)}"><div class="gicon">${esc(g.nom[0]||'G')}</div><div class="grow"><div class="t">${esc(g.nom)}</div><div class="s">${last?esc(nameOf(last.by)+' : '+(last.type==='image'?'Photo':last.type==='audio'?'Message vocal':(last.texte||'')).slice(0,70)):esc(g.desc||'')}</div></div>${n?`<span class="pill acc">${n} nouveau${n>1?'x':''}</span>`:''}</div>`}).join('')}</div></section>`:''}
  </div>`;
 }};
+/* ---- Présence au cabinet (GPS) ---- */
+const SITE_TOL=30;
+function siteBanner(){const st=S.site||'checking',c=S.siteInfo||{};
+ const why=st==='checking'?'Vérification de votre position…':st==='nogps'?(c.msg||'La localisation est désactivée ou indisponible sur cet appareil.'):`Vous êtes à ${c.d>=1000?(c.d/1000).toFixed(1)+' km':Math.round(c.d||0)+' m'} du cabinet.`;
+ return `<div class="banner warn site-lock">${ic('lock')}<div style="flex:1"><b>Fonctionnalités disponibles uniquement au cabinet.</b><div class="small">${esc(why)} Hors du cabinet, seuls les groupes de discussion restent accessibles.</div></div>${st==='checking'?'':`<button class="btn ghost" data-act="siteRetry">Réessayer</button>`}</div>`}
+function setSite(st,info){const before=siteLock();S.site=st;S.siteInfo=info||{};if(st==='in')ls.set('ns_site_in',Date.now());
+ const after=siteLock();if(before!==after){if(S.dataStarted)restartData();renderNav();if(!allowedView(S.view))go('accueil');else{const m=$('#main');if(m&&Views[S.view]){m.innerHTML='';Views[S.view].mount?.(m);Views[S.view].update?.(m)}}}else if(S.view==='accueil'||!after)refresh()}
+function sitePos(p){const c=p.coords||p;const cab=S.cfg?.cabinet;if(!cab||cab.lat==null)return;const d=distM(cab,{lat:c.latitude,lng:c.longitude}),acc=c.accuracy||0,R=Number(cab.rayon)||10;
+ const eff=d-Math.min(acc,SITE_TOL);const ins=S.site==='in'?eff<=R+15:eff<=R;setSite(ins?'in':'out',{d,acc})}
+let siteWatch=null;
+function startSite(){if(S.isOwner||!S.cfg?.cabinet||S.cfg.cabinet.lat==null)return;
+ if(!S.site){const last=Number(ls.get('ns_site_in',0));S.site=Date.now()-last<120000?'in':'checking'}
+ if(!navigator.geolocation){setSite('nogps',{msg:'Cet appareil ne permet pas de vérifier votre position (pas de GPS).'});return}
+ const err=e=>setSite('nogps',{msg:geoErr(e)});
+ navigator.geolocation.getCurrentPosition(sitePos,err,{enableHighAccuracy:true,timeout:20000,maximumAge:15000});
+ if(siteWatch==null)siteWatch=navigator.geolocation.watchPosition(sitePos,err,{enableHighAccuracy:true,maximumAge:20000,timeout:60000})}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&S.site){S.site=S.site==='in'?'in':'checking';startSite()}});
 function banners(){
+ if(siteLock()&&S.authUser&&!gated())return siteBanner();
  if(!S.ready)return `<div class="banner info">Connexion aux données du cabinet…</div>`;
  if(!S.db)return `<div class="banner">Connexion au serveur du cabinet impossible. Vérifiez la configuration (config.js) et la connexion Internet.</div>`;
  if(S.offline)return `<div class="banner">Hors connexion : vos modifications seront envoyées dès le retour du réseau.</div>`;
@@ -706,22 +769,25 @@ function banners(){
 }
 
 /* ---- Agenda ---- */
+const dayOnly=()=>!perm('rdv_voir')&&perm('rdv_jour');
 Views.agenda={
- mount(el){el.innerHTML=`<div class="stack">
-  <div class="head"><div><div class="eyebrow">Agenda</div><h1 id="agTitle"></h1></div><span class="sp"></span>
-   <div class="row" style="gap:4px"><button class="ib" data-act="agShift" data-n="-7" aria-label="Semaine précédente">${ic('left')}</button><button class="btn ghost" data-act="agToday">Aujourd'hui</button><button class="ib" data-act="agShift" data-n="7" aria-label="Semaine suivante">${ic('right')}</button></div></div>
-  <div class="days" id="agDays"></div>
+ mount(el){if(dayOnly()&&S.agDate!==today()){S.agDate=today();subRdvSel()}const jo=dayOnly();el.innerHTML=`<div class="stack">
+  <div class="head"><div><div class="eyebrow">${jo?'Rendez-vous du jour':'Agenda'}</div><h1 id="agTitle"></h1></div><span class="sp"></span>
+   ${jo?'':`<div class="row" style="gap:4px">${S.isOwner?`<button class="btn ghost" data-act="soinTypes">${ic('edit')}Types de soins</button>`:''}<button class="ib" data-act="agShift" data-n="-7" aria-label="Semaine précédente">${ic('left')}</button><button class="btn ghost" data-act="agToday">Aujourd'hui</button><button class="ib" data-act="agShift" data-n="7" aria-label="Semaine suivante">${ic('right')}</button></div>`}</div>
+  ${jo?`<div class="small muted">Appui long sur un patient pour ajouter des photos, une radio, les soins de la séance ou une note.</div>`:'<div class="days" id="agDays"></div>'}
+  <div class="legend" id="agLegend"></div>
   <div class="card" style="padding-block:4px" id="agList"></div>
  </div>${perm('rdv_gerer')?`<button class="btn pri big fab" data-act="rdvNew">${ic('plus')}Rendez-vous</button>`:''}`},
  update(){const d=S.agDate;$('#agTitle').textContent=fmtDate(d).replace(/^./,c=>c.toUpperCase());
   const dt=new Date(d+'T12:00:00');const mon=addDays(d,-((dt.getDay()+6)%7));
-  $('#agDays').innerHTML=Array.from({length:7},(_,i)=>{const x=addDays(mon,i);const o=new Date(x+'T12:00:00');
+  const AD=$('#agDays');if(AD)AD.innerHTML=Array.from({length:7},(_,i)=>{const x=addDays(mon,i);const o=new Date(x+'T12:00:00');
    return `<button class="day ${x===today()?'today':''}" aria-pressed="${x===d}" data-act="agPick" data-d="${x}">${o.toLocaleDateString('fr-FR',{weekday:'short'}).replace('.','')}<b>${o.getDate()}</b></button>`}).join('');
   const list=[...S.rdvSel].sort((a,b)=>(a.heure||'').localeCompare(b.heure||''));
-  $('#agList').innerHTML=list.length?list.map(r=>`<div data-lp="${esc(r.id)}" class="rdv ${['annule','absent'].includes(r.statut)?'dim':''}">
+  const LG=$('#agLegend');if(LG)LG.innerHTML=soinLegend();
+  $('#agList').innerHTML=list.length?list.map(r=>`<div data-lp="${esc(r.id)}" style="--tc:${esc(soinOf(r)?.c||'transparent')}" class="rdv ${['annule','absent'].includes(r.statut)?'dim':''}">
     <div class="h">${esc(r.heure||'--:--')}<small>${esc(r.duree||30)} min</small></div>
-    <div class="grow" data-act="rdvEdit" data-id="${esc(r.id)}"><div style="font-weight:600">${esc(r.patient||'Patient')}</div><div class="small muted">${esc([r.acte,r.praticien,r.tel].filter(Boolean).join(' · '))}</div>${r.soins?.texte?`<div class="small"><b>Soins :</b> ${esc(r.soins.texte)}</div>`:''}${r.note?`<div class="small muted">${esc(r.note)}</div>`:''}</div>
-    <div class="rdv-side">${r.patientId&&perm('pat_voir')?`<button class="ib" data-act="openPat" data-id="${esc(r.patientId)}" aria-label="Ouvrir la fiche patient" title="Fiche patient">${ic('folder')}</button>`:''}<select class="sel-pill" aria-label="Statut" data-rdvstat="${esc(r.id)}" ${perm('rdv_gerer')?'':'disabled'}>${Object.entries(STATUTS).map(([k,v])=>`<option value="${k}" ${r.statut===k?'selected':''}>${esc(v)}</option>`).join('')}</select></div>
+    <div class="grow" data-act="${dayOnly()?'rdvMenu':'rdvEdit'}" data-id="${esc(r.id)}"><div style="font-weight:600">${esc(r.patient||'Patient')}${soinTag(r)}</div><div class="small muted">${esc([r.acte,r.praticien,r.tel].filter(Boolean).join(' · '))}</div>${r.soins?.texte?`<div class="small"><b>Soins :</b> ${esc(r.soins.texte)}</div>`:''}${r.note?`<div class="small muted">${esc(r.note)}</div>`:''}</div>
+    <div class="rdv-side">${r.patientId&&perm('pat_voir')?`<button class="ib" data-act="openPat" data-id="${esc(r.patientId)}" aria-label="Ouvrir la fiche patient" title="Fiche patient">${ic('folder')}</button>`:''}<select class="sel-pill" aria-label="Statut" data-rdvstat="${esc(r.id)}" ${perm('rdv_gerer')||perm('rdv_jour')?'':'disabled'}>${Object.entries(STATUTS).map(([k,v])=>`<option value="${k}" ${r.statut===k?'selected':''}>${esc(v)}</option>`).join('')}</select></div>
    </div>`).join(''):`<div class="empty"><strong>Aucun rendez-vous ce jour</strong>${perm('rdv_gerer')?'Ajoutez le premier avec le bouton « Rendez-vous ».':''}</div>`;
   $$('[data-rdvstat]').forEach(s=>s.onchange=()=>W(()=>S.db.doc('rdv/'+s.dataset.rdvstat).update({statut:s.value,maj:Date.now(),par:S.uid}),'Statut : '+STATUTS[s.value]));
  }};
@@ -734,10 +800,10 @@ Views.agenda={
  ['pointerup','pointercancel','scroll'].forEach(ev=>document.addEventListener(ev,cancel,{passive:true,capture:true}));
  document.addEventListener('click',e=>{if(fired&&e.target.closest('#agList [data-lp]')){e.stopPropagation();e.preventDefault();fired=false}},true);
  document.addEventListener('contextmenu',e=>{const row=e.target.closest('#agList [data-lp]');if(row){e.preventDefault();if(!fired)rdvMenu(row.dataset.lp)}});})();
-async function rdvPatientId(r){if(r.patientId)return r.patientId;if(!perm('pat_edit')){toast('Ce rendez-vous n\'est lié à aucune fiche patient.','err');return null}
+async function rdvPatientId(r){if(r.patientId)return r.patientId;if(!perm('pat_edit')){toast('Ce rendez-vous n\'est lié à aucune fiche patient. Demandez à l\'accueil de créer la fiche.','err');return null}
  try{const pt=await findOrCreatePatient({full:r.patient,tel:r.tel});if(!pt)return null;if(perm('rdv_gerer'))await S.db.doc('rdv/'+r.id).update({patientId:pt.id,patient:pt.nom||r.patient});r.patientId=pt.id;return pt.id}catch(e){console.warn(e);toast(errMsg(e),'err');return null}}
-function rdvMenu(id){const r=S.rdvSel.find(x=>x.id===id);if(!r)return;const docs=perm('pat_docs')&&!!S.assets,g=perm('rdv_gerer');
- const items=[docs&&['photo','img','Ajouter des photos'],docs&&['radio','tooth','Ajouter une radio'],g&&['soins','check','Soins de la séance'],g&&['note','edit','Écrire une note'],r.patientId&&perm('pat_voir')&&['fiche','folder','Ouvrir la fiche patient'],['rdv','cal','Modifier le rendez-vous']].filter(Boolean);
+function rdvMenu(id){const r=S.rdvSel.find(x=>x.id===id);if(!r)return;const docs=(perm('pat_docs')||perm('rdv_jour'))&&!!S.assets,g=perm('rdv_gerer')||perm('rdv_jour');
+ const items=[docs&&['photo','img','Ajouter des photos'],docs&&['radio','tooth','Ajouter une radio'],g&&['soins','check','Soins de la séance'],g&&['note','edit','Écrire une note'],r.patientId&&perm('pat_voir')&&['fiche','folder','Ouvrir la fiche patient'],perm('rdv_gerer')&&['rdv','cal','Modifier le rendez-vous']].filter(Boolean);
  const d=openModal({title:r.patient||'Patient',ok:null,cancel:'Fermer',body:`<div class="small muted" style="margin-top:-6px">${esc([r.heure,r.acte].filter(Boolean).join(' · '))}</div><div class="menu-list">${items.map(([k,i,l])=>`<button type="button" class="menu-it" data-k="${k}">${ic(i)}<span>${esc(l)}</span>${ic('right')}</button>`).join('')}</div>`});
  d.querySelector('.menu-list').onclick=async e=>{const b=e.target.closest('[data-k]');if(!b)return;const k=b.dataset.k;
   if(k==='photo'||k==='radio'){const pid=await rdvPatientId(r);if(!pid)return;d.close();S.upPid=pid;S.upType=k;const i=$('#patfile');i.accept='image/*';i.multiple=k==='photo';i.click()}
@@ -745,12 +811,21 @@ function rdvMenu(id){const r=S.rdvSel.find(x=>x.id===id);if(!r)return;const docs
 function rdvSoins(r){const so=r.soins||{};openModal({title:'Soins de la séance',body:`<div class="small muted">${esc(r.patient||'')}, ${esc(fmtDate(r.date,{weekday:'long',day:'numeric',month:'long'}))}</div>
   <label class="f">Soins réalisés<textarea class="inp" name="texte" id="so-t" rows="4" placeholder="Ex. : Traitement endodontique 36, obturation canalaire" required>${esc(so.texte||'')}</textarea></label>
   <div class="fgrid"><label class="f">Dent(s)<input class="inp" name="dents" id="so-d" value="${esc(so.dents||'')}" placeholder="36"></label><label class="f">Prochaine étape<input class="inp" name="suite" id="so-s" value="${esc(so.suite||'')}" placeholder="Couronne, contrôle…"></label></div>
-  <label class="row small" style="gap:8px"><input type="checkbox" name="fini" ${r.statut==='termine'||!so.texte?'checked':''}> Marquer le rendez-vous comme terminé</label>`,
- onOk:async f=>{if(!f.texte.trim()){toast('Décrivez les soins réalisés.','err');return false}const data={soins:{texte:f.texte.trim(),dents:f.dents.trim(),suite:f.suite.trim(),by:S.uid,ts:Date.now()},maj:Date.now(),par:S.uid};if(f.fini)data.statut='termine';
-  return W(()=>S.db.doc('rdv/'+r.id).update(data),'Soins enregistrés')}})}
+  <label class="row small" style="gap:8px"><input type="checkbox" name="fini" ${r.statut==='termine'||!so.texte?'checked':''}> Marquer le rendez-vous comme terminé</label>
+  ${perm('rdv_gerer')?`<section class="card stack" style="gap:10px;padding:14px"><b>Prochain rendez-vous</b><div class="small muted">Facultatif. Si vous fixez une date, le type de soin de la prochaine séance est obligatoire.</div>
+   <div class="fgrid"><label class="f">Date<input class="inp" type="date" name="nDate" id="so-nd" min="${today()}"></label><label class="f">Heure<input class="inp" type="time" name="nHeure" id="so-nh" step="300"></label>
+   <label class="f">Durée<select class="inp" name="nDuree" id="so-ndu">${[15,20,30,45,60,90,120,180].map(n=>`<option value="${n}" ${n===30?'selected':''}>${n} min</option>`).join('')}</select></label></div>
+   <label class="f">Type de soin de la prochaine séance<select class="inp" name="nType" id="so-nt"><option value="">— Choisir —</option>${soinTypes().map(t=>`<option value="${esc(t.id)}">${esc(t.nom)}</option>`).join('')}</select></label>
+   <label class="f">Précision<input class="inp" name="nActe" id="so-na" list="dl-actes3" placeholder="Ex. : Empreinte couronne 36"></label><datalist id="dl-actes3">${ACTES.map(a=>`<option value="${esc(a)}">`).join('')}</datalist></section>`:''}`,
+ onOk:async f=>{if(!f.texte.trim()){toast('Décrivez les soins réalisés.','err');return false}
+  if(f.nDate&&(!f.nHeure||!f.nType)){toast(!f.nType?'Choisissez le type de soin de la prochaine séance.':'Indiquez l\'heure du prochain rendez-vous.','err');return false}
+  const data={soins:{texte:f.texte.trim(),dents:f.dents.trim(),suite:f.suite.trim(),by:S.uid,ts:Date.now()},maj:Date.now(),par:S.uid};if(f.fini)data.statut='termine';
+  if(!await W(()=>S.db.doc('rdv/'+r.id).update(data),'Soins enregistrés'))return false;
+  if(f.nDate)await W(()=>S.db.collection('rdv').add({patient:r.patient||'',patientId:r.patientId||null,tel:r.tel||'',date:f.nDate,heure:f.nHeure,duree:Number(f.nDuree)||30,type:f.nType,acte:(f.nActe||'').trim(),praticien:r.praticien||'',statut:'prevu',note:'',maj:Date.now(),par:S.uid,cree:Date.now(),creePar:S.uid}),'Prochain rendez-vous fixé le '+fmtDate(f.nDate,{weekday:'long',day:'numeric',month:'long'})+' à '+f.nHeure);
+  return true}})}
 function rdvNote(r){openModal({title:'Note',body:`<div class="small muted">${esc(r.patient||'')}</div><label class="f">Note du rendez-vous<textarea class="inp" name="note" id="nt-t" rows="4">${esc(r.note||'')}</textarea></label>`,
  onOk:f=>W(()=>S.db.doc('rdv/'+r.id).update({note:f.note.trim(),maj:Date.now(),par:S.uid}),'Note enregistrée')})}
-function subRdvSel(){S.subs.rdvSel?.();S.rdvSel=[];if(!S.db||!S.uid||!perm('rdv_voir'))return;
+function subRdvSel(){S.subs.rdvSel?.();S.rdvSel=[];if(!S.db||!S.uid||!(perm('rdv_voir')||perm('rdv_jour')))return;if(dayOnly())S.agDate=today();
  S.subs.rdvSel=S.db.collection('rdv').where('date','==',S.agDate).onSnapshot(s=>{S.rdvSel=s.docs.map(d=>({id:d.id,...d.data()}));refresh('agenda')},e=>console.warn(e))}
 function rdvModal(r){r=r||{date:S.agDate,heure:'',duree:30,statut:'prevu'};const ro=!perm('rdv_gerer');S.patPick={};
  const praticiens=teamMembers().filter(u=>['dentiste','stagiaire'].includes(roleOf(u))).map(nameOf);
@@ -763,17 +838,18 @@ function rdvModal(r){r=r||{date:S.agDate,heure:'',duree:30,statut:'prevu'};const
  <div class="fgrid"><label class="f">Date<input class="inp" type="date" name="date" id="rd-date" value="${esc(r.date)}" required></label>
  <label class="f">Heure<input class="inp" type="time" name="heure" id="rd-heure" value="${esc(r.heure||'')}" step="300" required></label>
  <label class="f">Durée<select class="inp" name="duree" id="rd-duree">${[15,20,30,45,60,90,120,180].map(n=>`<option value="${n}" ${Number(r.duree)===n?'selected':''}>${n} min</option>`).join('')}</select></label></div>
- <div class="fgrid"><label class="f">Acte<input class="inp" name="acte" id="rd-acte" list="dl-actes" value="${esc(r.acte||'')}"></label>
+ <label class="f">Type de soin de la séance (obligatoire)<select class="inp" name="type" id="rd-type" required><option value="">— Choisir le type de soin —</option>${soinTypes().map(t=>`<option value="${esc(t.id)}" ${r.type===t.id?'selected':''}>${esc(t.nom)}</option>`).join('')}</select></label>
+ <div class="fgrid"><label class="f">Acte (précision)<input class="inp" name="acte" id="rd-acte" list="dl-actes" value="${esc(r.acte||'')}"></label>
  <label class="f">Praticien<input class="inp" name="praticien" id="rd-prat" list="dl-prat" value="${esc(r.praticien||'')}"></label></div>
  <div class="fgrid"><label class="f">Téléphone<input class="inp" name="tel" id="rd-tel" type="tel" inputmode="tel" value="${esc(r.tel||'')}"></label>
  <label class="f">Statut<select class="inp" name="statut" id="rd-statut">${Object.entries(STATUTS).map(([k,v])=>`<option value="${k}" ${r.statut===k?'selected':''}>${esc(v)}</option>`).join('')}</select></label></div>
  <label class="f">Note<textarea class="inp" name="note" id="rd-note" rows="2" style="min-height:60px">${esc(r.note||'')}</textarea></label>
  <datalist id="dl-actes">${ACTES.map(a=>`<option value="${esc(a)}">`).join('')}</datalist><datalist id="dl-prat">${praticiens.map(a=>`<option value="${esc(a)}">`).join('')}</datalist></fieldset>`,
- onOk:async f=>{if(!f.patient.trim()||!f.date||!f.heure){toast('Indiquez le patient, la date et l\'heure.','err');return false}
+ onOk:async f=>{if(!f.patient.trim()||!f.date||!f.heure){toast('Indiquez le patient, la date et l\'heure.','err');return false}if(!f.type){toast('Choisissez le type de soin de la séance.','err');$('#rd-type')?.focus();return false}
   const pick=S.patPick[f.patient];let patient=f.patient.trim(),patientId=r.patientId||null,tel=f.tel.trim();
   if(pick){patient=pick.nom;patientId=pick.id;if(!tel)tel=pick.tel||''}else if(patient!==(r.patient||'')){patientId=null}
   if(!patientId&&perm('pat_edit')&&(f.mkpat||!$('#rd-mkpat'))){try{const pt=await findOrCreatePatient({full:patient,nom:f.newNom,prenom:f.newPrenom,tel});if(pt){patientId=pt.id;patient=pt.nom;if(!tel&&pt.tel)tel=pt.tel}}catch(e){console.warn(e)}}
-  const data={patient,patientId,date:f.date,heure:f.heure,duree:Number(f.duree),acte:f.acte.trim(),praticien:f.praticien.trim(),tel,statut:f.statut,note:f.note.trim(),maj:Date.now(),par:S.uid};
+  const data={patient,patientId,date:f.date,heure:f.heure,duree:Number(f.duree),type:f.type,acte:f.acte.trim(),praticien:f.praticien.trim(),tel,statut:f.statut,note:f.note.trim(),maj:Date.now(),par:S.uid};
   const ok=r.id?await W(()=>S.db.doc('rdv/'+r.id).update(data),'Rendez-vous modifié'):await W(()=>S.db.collection('rdv').add({...data,cree:Date.now(),creePar:S.uid}),'Rendez-vous ajouté');
   if(ok&&S.view==='agenda'&&f.date!==S.agDate){S.agDate=f.date;subRdvSel();refresh('agenda')}if(ok&&S.patient)loadPatRdv();return ok},
  onDel:async()=>{if(!await ask('Supprimer ce rendez-vous ?','Supprimer'))return false;const ok=await W(()=>S.db.doc('rdv/'+r.id).delete(),'Rendez-vous supprimé');if(ok&&S.patient)loadPatRdv();return ok}});
@@ -940,16 +1016,17 @@ function openPatient(id){closePatient();S.histAll=false;S.rdvAll=false;S.patient
  if(S.db){S.subs.pat=S.db.doc('patients/'+id).onSnapshot(s=>{S.patDoc=s.exists?{id,...s.data()}:false;refresh('patients')},e=>console.warn(e));
   S.subs.patDocs=S.db.collection(`patients/${id}/docs`).orderBy('ts','desc').limit(300).onSnapshot(s=>{S.patDocs=s.docs.map(d=>({id:d.id,...d.data()}));refresh('patients')},e=>console.warn(e));loadPatRdv();loadPatHist(id)}
  go('patients')}
-async function loadPatHist(id){S.patHist=null;S.patFin=null;
+async function loadPatHist(id){S.patHist=null;S.patFin=null;S.patCaisse=null;
  try{if(perm('pat_voir')){const h=await S.db.doc('historique/'+id).get();if(S.patient!==id)return;S.patHist=h.exists?h.data():null}}catch(e){}
  try{if(S.isOwner){const f=await S.db.doc('finances/'+id).get();if(S.patient!==id)return;S.patFin=f.exists?f.data():null}}catch(e){}
- refresh('patients')}
+ refresh('patients');
+ try{if(S.isOwner&&S.cfg.caisse?.pub){const c=await fetchRec('patientId',id);if(S.patient!==id)return;S.patCaisse=c.filter(x=>!x.err);if(c.length)refresh('patients')}}catch(e){}}
 const MAD0=n=>new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(n||0)+' DH';
 function histHTML(){const h=(S.patHist?.soins||[]).map(hS);if(!h.length)return '';const L=[...h].reverse();const more=L.length>12&&!S.histAll;
  return `<section class="card"><div class="card-h"><h3>Historique des soins</h3><span class="sp"></span><span class="small muted">${h.length} acte${h.length>1?'s':''}</span></div>
  <div class="tablewrap"><table><thead><tr><th>Date</th><th>Dent</th><th>Acte</th></tr></thead><tbody>${(more?L.slice(0,12):L).map(x=>`<tr><td class="num" style="white-space:nowrap">${esc(x.d?fmtDate(x.d,{day:'2-digit',month:'2-digit',year:'numeric'}):'')}</td><td>${esc(x.dent)}</td><td>${esc(x.acte)}${x.c?`<div class="small muted">${esc(x.c)}</div>`:''}</td></tr>`).join('')}</tbody></table></div>
  ${more?`<button class="btn ghost" data-act="histAll" style="margin-top:8px">Afficher tout l'historique</button>`:''}</section>`}
-function finHTML(){if(!S.isOwner||!S.patFin)return '';const f=S.patFin;const A=(f.actes||[]).map(hA),P=(f.paiements||[]).map(hP);
+function finHTML(){const CA=(S.patCaisse||[]).map(x=>({d:x.date,m:Number(x.montant)||0,mode:x.mode,obs:'Caisse'+(x.acte?' · '+x.acte:'')+' · '+nameOf(x.uid)}));if(!S.isOwner||(!S.patFin&&!CA.length))return '';const f=S.patFin||{};const A=(f.actes||[]).map(hA),P=[...(f.paiements||[]).map(hP),...CA].sort((a,b)=>(a.d||'').localeCompare(b.d||''));
  const th=A.reduce((t,a)=>t+(a.prix-a.remise),0),tp=P.reduce((t,x)=>t+x.m,0),r=th-tp;const MO={especes:'Espèces',carte:'Carte',cheque:'Chèque',virement:'Virement'};
  return `<section class="card stack" style="gap:12px"><div class="card-h"><h3>Honoraires et paiements</h3><span class="sp"></span><span class="pill acc">${ic('lock')}Visible par vous seul</span></div>
  <div class="mini-kpis"><div class="kpi"><b>${MAD0(th)}</b><span class="small muted">honoraires</span></div><div class="kpi"><b>${MAD0(tp)}</b><span class="small muted">payé</span></div><div class="kpi"><b style="color:${r>0.5?'var(--bad)':'var(--ok)'}">${MAD0(r)}</b><span class="small muted">${r>0.5?'reste à payer':r<-0.5?'avance':'soldé'}</span></div></div>
@@ -1205,11 +1282,11 @@ function scanModal(){const lab=S.stockZone==='labo';const CATS=lab?LAB_CATS:STOC
  const askNew=c=>{const P=$('#sc-new');S.scan.pending=c;beep(false);const its=zoneItems().slice().sort((a,b)=>(a.nom||'').localeCompare(b.nom||'','fr'));
   P.hidden=false;P.innerHTML=`<div><b>Code inconnu</b> <span class="small muted">${esc(c.key)}${c.lot?', lot '+esc(c.lot):''}</span></div>
    <div class="small muted">Associez ce code à un article existant, ou créez l'article. Les prochains scans de ce produit seront reconnus automatiquement.</div>
-   <label class="f">Article<input class="inp" id="sc-nom" list="dl-scn" autocomplete="off" placeholder="Nom de l'article"></label><datalist id="dl-scn">${its.map(i=>`<option value="${esc(i.nom)}">`).join('')}${lab?'':CATS.flatMap(catItems).map(x=>`<option value="${esc(x.nom)}">`).join('')}</datalist>
+   <label class="f">Article<input class="inp" id="sc-nom" list="dl-scn" autocomplete="off" placeholder="Nom de l'article"></label><datalist id="dl-scn">${its.map(i=>`<option value="${esc(i.nom)}">`).join('')}${CATS.flatMap(catItems).map(x=>`<option value="${esc(x.nom)}">`).join('')}</datalist>
    <div class="fgrid" id="sc-newf"><label class="f">Section<select class="inp" id="sc-cat">${CATS.map(x=>`<option ${x===S.stockFilter?'selected':''}>${esc(x)}</option>`).join('')}</select></label><label class="f">Unité<input class="inp" id="sc-un" placeholder="boîte, pièce…"></label></div>
    <div class="row" style="gap:8px"><span class="sp"></span><button type="button" class="btn ghost" id="sc-skip">Ignorer</button><button type="button" class="btn pri" id="sc-ok">Enregistrer</button></div>`;
   const nm=$('#sc-nom');const sync=()=>{const ex=its.find(i=>norm(i.nom)===norm(nm.value));$('#sc-newf').hidden=!!ex;$('#sc-ok').textContent=ex?'Associer et '+(S.scan.mode==='in'?'ajouter':'retirer'):'Créer l\'article';
-   if(!ex&&!lab){for(const s of STOCK_SECTIONS){const x=catItems(s.n).find(y=>y.nom===nm.value.trim());if(x){$('#sc-cat').value=s.n;if(!$('#sc-un').value)$('#sc-un').value=x.unite;break}}}};
+   if(!ex){for(const s of zoneSecs()){const x=catItems(s.n).find(y=>y.nom===nm.value.trim());if(x){$('#sc-cat').value=s.n;if(!$('#sc-un').value)$('#sc-un').value=x.unite;break}}}};
   nm.addEventListener('input',sync);nm.addEventListener('change',sync);sync();setTimeout(()=>nm.focus(),50);
   $('#sc-skip').onclick=()=>{P.hidden=true;S.scan.pending=null};
   $('#sc-ok').onclick=async()=>{const name=nm.value.trim();if(!name){toast('Indiquez l\'article.','err');return}const ex=its.find(i=>norm(i.nom)===norm(name));
@@ -1244,35 +1321,35 @@ const isPeu=i=>qtyOf(i)<=2;
 const perPill=i=>{if(!i.peremption||qtyOf(i)<=0)return '';const t=today();const soon=new Date(Date.now()+60*864e5).toISOString().slice(0,10);return i.peremption<t?' <span class="pill bad">Périmé</span>':i.peremption<=soon?` <span class="pill warn">Pér. ${esc(fmtDate(i.peremption,{day:'numeric',month:'short'}))}</span>`:''};
 const secIni=n=>n.replace(/&/g,'').split(/[\s-]+/).filter(w=>w.length>2||/^[A-Z]/.test(w)).slice(0,2).map(w=>w[0].toUpperCase()).join('');
 function stockUpdate(){const L=$('#stList');if(!L)return;const Z=zoneItems();const low=Z.filter(isLow).length;const lab=S.stockZone==='labo';const CATS=lab?LAB_CATS:STOCK_CATS;
-  const cats=[...new Set(Z.map(stockCat))].sort((a,b)=>(CATS.indexOf(a)+1||99)-(CATS.indexOf(b)+1||99));const allCats=lab?cats:[...CATS,...cats.filter(c=>!CATS.includes(c))];
+  const cats=[...new Set(Z.map(stockCat))].sort((a,b)=>(CATS.indexOf(a)+1||99)-(CATS.indexOf(b)+1||99));const allCats=[...CATS,...cats.filter(c=>!CATS.includes(c))];
   if(!['tous','bas','peu'].includes(S.stockFilter)&&!allCats.includes(S.stockFilter))S.stockFilter='tous';
   const q=S.stockQ.trim().toLowerCase();const can=canStock();const F=S.stockFilter;
   const peu=Z.filter(isPeu);
-  const chips=lab?[['tous','Tout ('+Z.length+')'],['peu','2 pièces ou moins ('+peu.length+')'],['bas','À commander ('+low+')'],...cats.map(c=>[c,c])]:[['tous','Sections ('+Z.length+' articles)'],['peu','2 pièces ou moins ('+peu.length+')'],['bas','À commander ('+low+')'],...(!['tous','bas','peu'].includes(F)?[[F,F]]:[])];
+  const chips=[['tous','Sections ('+Z.length+' articles)'],['peu','2 pièces ou moins ('+peu.length+')'],['bas','À commander ('+low+')'],...(!['tous','bas','peu'].includes(F)?[[F,F]]:[])];
   $('#stChips').innerHTML=chips.map(([k,v])=>`<button class="chip" aria-pressed="${F===k}" data-act="stFilter" data-k="${esc(k)}">${esc(v)}</button>`).join('');
   const sort=a=>a.sort((x,y)=>(isLow(y)-isLow(x))||(x.nom||'').localeCompare(y.nom||'','fr'));
-  if(!lab&&!q&&F==='tous'){L.classList.add('plain');
+  if(!q&&F==='tous'){L.classList.add('plain');
    const pz=sort(peu.slice());L.innerHTML=(pz.length?`<section class="card stack" style="gap:4px;margin-bottom:12px;border-color:var(--bad)"><div class="row"><h3 style="color:var(--bad)">Il reste 2 pièces ou moins</h3><span class="sp"></span><button class="btn ghost" data-act="stFilter" data-k="peu">Tout voir (${pz.length})</button></div>${pz.slice(0,8).map(i=>stockRow(i,can)).join('')}</section>`:'')+`<div class="secgrid">${allCats.map(c=>{const it=Z.filter(i=>stockCat(i)===c);const lo=it.filter(isLow).length;const sec=stockSec(c);
     return `<button class="sec" data-act="stFilter" data-k="${esc(c)}"><span class="ini">${esc(secIni(c))}</span><span style="min-width:0"><div class="n">${esc(c)}</div>${sec?`<div class="d">${esc(sec.d)}</div>`:''}</span><span class="c">${it.length?it.length+' article'+(it.length>1?'s':''):'Vide'}${lo?`<br><span class="pill bad">${lo} à commander</span>`:''}</span></button>`}).join('')}</div>`;return}
   L.classList.remove('plain');
   const items=sort(Z.filter(i=>(F==='tous'||(F==='bas'?isLow(i):F==='peu'?isPeu(i):stockCat(i)===F))&&(!q||[i.nom,i.fournisseur,i.lieu,stockCat(i)].join(' ').toLowerCase().includes(q))));
-  const isSec=!lab&&!['tous','bas','peu'].includes(F);const sec=isSec&&stockSec(F);
+  const isSec=!['tous','bas','peu'].includes(F);const sec=isSec&&stockSec(F);
   const head=isSec?`<div class="row" style="padding:10px 2px 6px;gap:8px;flex-wrap:wrap"><button class="btn ghost" data-act="stFilter" data-k="tous">${ic('left')}Sections</button><span class="sp"></span>${can?`${sec?`<button class="btn ghost" data-act="stockCatalog" data-k="${esc(F)}">${ic('plus')}Ajouter depuis le catalogue</button>`:''}<button class="btn ghost" data-act="stockEdit" data-id="">${ic('plus')}Article</button>`:''}</div><h3 style="margin:2px 2px 6px">${esc(F)}</h3>`:'';
   L.innerHTML=head+(items.length?items.map(i=>stockRow(i,can)).join('')
    :isSec?`<div class="empty"><strong>Aucun article dans cette section</strong>${can&&sec?'Utilisez « Ajouter depuis le catalogue » pour cocher les articles que vous utilisez, puis indiquez les quantités et les seuils.':''}</div>`
    :F==='peu'&&Z.length?`<div class="empty"><strong>Aucun article à 2 pièces ou moins</strong></div>`:Z.length?`<div class="empty"><strong>Aucun article trouvé</strong>Modifiez la recherche ou le filtre.</div>`:`<div class="empty"><strong>Le stock ${lab?'du laboratoire':''} est vide</strong>${can?`Ajoutez ${lab?'vos disques de zircone, résines, cires et feuilles de thermoformage':'vos consommables, matériaux et instruments'} avec le bouton « Article ». Indiquez un seuil pour être alerté avant la rupture.`:''}</div>`)}
 function stockCatalog(sec){const Z=zoneItems();const have=new Set(Z.map(i=>norm(i.nom)));const list=catItems(sec);const free=list.filter(x=>!have.has(norm(x.nom)));
  openModal({title:sec,ok:free.length?'Ajouter la sélection':null,cancel:'Fermer',
-  body:`<div class="small muted">Cochez les articles utilisés au cabinet. Ils seront ajoutés avec une quantité de 0 : indiquez ensuite la quantité et le seuil d'alerte de chacun.</div>
+  body:`<div class="small muted">Cochez les articles que vous utilisez. Ils seront ajoutés avec une quantité de 0 : indiquez ensuite la quantité et le seuil d'alerte de chacun.</div>
   ${free.length?`<label class="row small" style="gap:8px;cursor:pointer"><input type="checkbox" id="cat-all"> Tout sélectionner</label>`:''}
   <div class="catlist">${list.map((x,k)=>have.has(norm(x.nom))?`<label style="opacity:.55"><input type="checkbox" checked disabled>${esc(x.nom)} <span class="small muted">— déjà en stock</span></label>`:`<label><input type="checkbox" name="ci" value="${k}">${esc(x.nom)} <span class="small muted">(${esc(x.unite)})</span></label>`).join('')}</div>`,
   onOk:async(f,form)=>{const ks=[...form.querySelectorAll('input[name=ci]:checked')].map(c=>list[+c.value]);if(!ks.length){toast('Cochez au moins un article.','err');return false}
-   const ok=await W(async()=>{for(let o=0;o<ks.length;o+=400){const b=S.db.batch();ks.slice(o,o+400).forEach(x=>b.set(S.db.collection('stock').doc(),{nom:x.nom,cat:sec,unite:x.unite,qte:0,seuil:0,lieu:'',fournisseur:'',zone:'cabinet',maj:Date.now(),par:S.uid}));await b.commit()}},ks.length+' article'+(ks.length>1?'s ajoutés':' ajouté'));
+   const ok=await W(async()=>{for(let o=0;o<ks.length;o+=400){const b=S.db.batch();ks.slice(o,o+400).forEach(x=>b.set(S.db.collection('stock').doc(),{nom:x.nom,cat:sec,unite:x.unite,qte:0,seuil:0,lieu:'',fournisseur:'',zone:S.stockZone||'cabinet',maj:Date.now(),par:S.uid}));await b.commit()}},ks.length+' article'+(ks.length>1?'s ajoutés':' ajouté'));
    if(ok){S.stockFilter=sec;stockUpdate()}return ok}});
  const all=$('#cat-all');if(all)all.onchange=()=>document.querySelectorAll('#dlg input[name=ci]').forEach(c=>c.checked=all.checked)}
 Views.stock={mount(el){S.stockZone='cabinet';stockMount(el,false)},update(){stockUpdate()}};
 function stockEdit(id){const lab=S.stockZone==='labo';const CATS0=lab?LAB_CATS:STOCK_CATS;const i=S.stock.find(x=>x.id===id)||{nom:'',cat:CATS0.includes(S.stockFilter)?S.stockFilter:CATS0[0],qte:0,seuil:0,unite:'',lieu:'',fournisseur:''};
- const curCat=lab?(i.cat||CATS0[0]):stockCat(i);const CATS=CATS0.includes(curCat)?CATS0:[...CATS0,curCat];
+ const curCat=stockCat(i);const CATS=CATS0.includes(curCat)?CATS0:[...CATS0,curCat];
  openModal({title:i.id?'Modifier l\'article':(lab?'Nouvel article du laboratoire':'Nouvel article'),del:i.id?'Supprimer':null,
  body:`<label class="f">Désignation<input class="inp" name="nom" id="st-nom" value="${esc(i.nom)}" required list="dl-stcat" autocomplete="off" placeholder="${lab?'Disque zircone multicouche A2 98×14':'Choisissez ou saisissez un article'}"></label><datalist id="dl-stcat"></datalist>
  <div class="fgrid"><label class="f">Catégorie<select class="inp" name="cat" id="st-cat">${CATS.map(c=>`<option ${curCat===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
@@ -1288,7 +1365,7 @@ function stockEdit(id){const lab=S.stockZone==='labo';const CATS0=lab?LAB_CATS:S
   const data={nom:f.nom.trim(),cat:f.cat,unite:f.unite.trim(),qte:Math.max(0,Number(f.qte)||0),seuil:Math.max(0,Number(f.seuil)||0),lieu:f.lieu.trim(),fournisseur:f.fournisseur.trim(),codes:[...new Set(String(f.codes||'').split(/[,;\s]+/).filter(Boolean).map(x=>parseCode(x).key))],maj:Date.now(),par:S.uid};
   delete S.stockLocal[i.id];return i.id?W(()=>S.db.doc('stock/'+i.id).update(data),'Article mis à jour'):W(()=>S.db.collection('stock').add({...data,zone:S.stockZone||'cabinet'}),'Article ajouté')},
  onDel:async()=>{if(!await ask('Supprimer « '+i.nom+' » du stock ?','Supprimer'))return false;return W(()=>S.db.doc('stock/'+i.id).delete(),'Article supprimé')}});
- if(!lab){const sel=$('#st-cat'),nm=$('#st-nom'),un=$('#st-unite');const fill=()=>{$('#dl-stcat').innerHTML=catItems(sel.value).map(x=>`<option value="${esc(x.nom)}">`).join('')};fill();sel.onchange=fill;
+ {const sel=$('#st-cat'),nm=$('#st-nom'),un=$('#st-unite');const fill=()=>{$('#dl-stcat').innerHTML=catItems(sel.value).map(x=>`<option value="${esc(x.nom)}">`).join('')};fill();sel.onchange=fill;
   nm.addEventListener('change',()=>{const x=catItems(sel.value).find(y=>y.nom===nm.value.trim());if(x&&!un.value.trim())un.value=x.unite})}}
 function changeQty(id,n){const it=S.stock.find(x=>x.id===id);if(!it)return;const v=Math.max(0,qtyOf(it)+n);S.stockLocal[id]=v;stockUpdate();
  later('qty-'+id,async()=>{const val=S.stockLocal[id];await W(()=>S.db.doc('stock/'+id).update({qte:val,maj:Date.now(),par:S.uid}));if(S.stockLocal[id]===val)delete S.stockLocal[id]},900)}
@@ -1435,15 +1512,29 @@ Views.caisse={
    <datalist id="dl-actes2">${ACTES.map(a=>`<option value="${esc(a)}">`).join('')}</datalist>
    <button class="btn pri big" type="submit">${ic('lock')}Enregistrer l'encaissement</button>
    <div class="small muted" id="caInfo"></div></form>
-   <div class="banner info">${ic('lock','').replace('<svg','<svg style="width:16px;height:16px;vertical-align:-3px;margin-right:6px"')}Une fois enregistré, un encaissement ne peut plus être consulté ni modifié depuis ce poste. Seul le Docteur voit les montants.</div>`;
+   <div class="banner info">${ic('lock','').replace('<svg','<svg style="width:16px;height:16px;vertical-align:-3px;margin-right:6px"')}${perm('caisse_edit')?'Vous pouvez corriger vos propres saisies du jour ci-dessous. Aucun total (jour, semaine, année) n\'est affiché : seul le Docteur voit les montants cumulés.':'Une fois enregistré, un encaissement ne peut plus être consulté ni modifié depuis ce poste. Seul le Docteur voit les montants.'}</div>
+   ${perm('caisse_edit')?'<section class="card stack" style="gap:6px"><h3>Mes saisies du jour</h3><div id="caMine" class="list"></div></section>':''}`;
   $('#caForm').onsubmit=async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));const mt=Number(String(f.montant).replace(',','.'));
    if(!(mt>0)){toast('Indiquez un montant valide.','err');return}if(!S.uid){toast('Identité indisponible : saisie impossible.','err');return}
    const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
-   try{const enc=await encryptFor(S.cfg.caisse.pub,{montant:mt,mode:f.mode,patient:(S.patPick?.[f.patient]?.nom||f.patient).trim(),acte:f.acte.trim(),note:f.note.trim()});
-    const ok=await W(()=>S.db.collection(`recettes/${S.uid}/e`).add({date:today(),mois:today().slice(0,7),ts:Date.now(),enc}),'Encaissement enregistré');
+   try{const pk=S.patPick?.[f.patient];const obj={montant:mt,mode:f.mode,patient:(pk?.nom||f.patient).trim(),acte:f.acte.trim(),note:f.note.trim()};const enc=await encryptFor(S.cfg.caisse.pub,obj);
+    const doc={date:today(),mois:today().slice(0,7),ts:Date.now(),enc,...(pk?.id?{patientId:pk.id}:{}),...(perm('caisse_edit')?{vu:obj}:{})};
+    const ok=await W(()=>S.db.collection(`recettes/${S.uid}/e`).add(doc),'Encaissement enregistré');
     if(ok){e.target.reset();S.patPick={}}}catch(err){console.warn(err);toast('Chiffrement impossible sur cet appareil.','err')}finally{btn.disabled=false}};
   if(perm('pat_voir'))patSuggest($('#ca-pat'))},
- update(){const i=$('#caInfo');if(i)i.textContent=S.myRecCount?`Vous avez enregistré ${S.myRecCount} encaissement${S.myRecCount>1?'s':''} aujourd'hui.`:'Aucun encaissement enregistré par vous aujourd\'hui.'}};
+ update(){const i=$('#caInfo');if(i)i.textContent=S.myRecCount?`Vous avez enregistré ${S.myRecCount} encaissement${S.myRecCount>1?'s':''} aujourd'hui.`:'Aucun encaissement enregistré par vous aujourd\'hui.';
+  const M=$('#caMine');if(M){const L=[...(S.myRec||[])].sort((a,b)=>b.ts-a.ts);M.innerHTML=L.length?L.map(x=>{const v=x.vu;return `<div class="li"><span class="timechip">${hm(x.ts)}</span><div class="grow"><div class="t">${v?esc(v.patient||'Patient non précisé'):'Saisie protégée'}</div><div class="s">${v?esc([v.acte,MODES[v.mode]].filter(Boolean).join(' · ')):'Saisie avant l\'activation des corrections'}${x.modifie?' · <span class="pill warn">corrigé</span>':''}</div></div>${v?`<b class="num" style="white-space:nowrap">${MAD0(v.montant)}</b><button class="btn ghost" data-act="caFix" data-id="${esc(x.id)}">${ic('edit')}Corriger</button>`:''}</div>`}).join(''):'<div class="small muted">Aucune saisie aujourd\'hui.</div>'}}};
+async function caFix(id){const x=(S.myRec||[]).find(y=>y.id===id);if(!x?.vu)return;const v=x.vu;
+ openModal({title:'Corriger l\'encaissement',body:`<div class="small muted">Saisi à ${hm(x.ts)}. La correction est signalée au Docteur avec le montant d'origine.</div>
+  <label class="f">Montant (DH)<input class="inp num" name="montant" id="cf-mt" type="number" inputmode="decimal" min="0" step="0.01" value="${esc(v.montant)}" required></label>
+  <div class="fgrid"><label class="f">Mode<select class="inp" name="mode" id="cf-mode">${Object.entries(MODES).map(([k,l])=>`<option value="${k}" ${v.mode===k?'selected':''}>${esc(l)}</option>`).join('')}</select></label><label class="f">Patient<input class="inp" name="patient" id="cf-pat" value="${esc(v.patient||'')}" autocomplete="off"></label></div>
+  <div class="fgrid"><label class="f">Acte<input class="inp" name="acte" id="cf-acte" value="${esc(v.acte||'')}"></label><label class="f">Note<input class="inp" name="note" id="cf-note" value="${esc(v.note||'')}"></label></div>`,
+ onOk:async f=>{const mt=Number(String(f.montant).replace(',','.'));if(!(mt>0)){toast('Indiquez un montant valide.','err');return false}
+  const pk=S.patPick?.[f.patient];const obj={montant:mt,mode:f.mode,patient:(pk?.nom||f.patient).trim(),acte:f.acte.trim(),note:f.note.trim()};
+  let enc;try{enc=await encryptFor(S.cfg.caisse.pub,obj)}catch(e){toast('Chiffrement impossible sur cet appareil.','err');return false}
+  const upd={enc,vu:obj,modifie:{ts:Date.now(),by:S.uid},...(x.encAvant?{}:{encAvant:x.enc}),...(pk?.id?{patientId:pk.id}:{})};
+  return W(()=>S.db.doc(`recettes/${S.uid}/e/${id}`).update(upd),'Encaissement corrigé')}});
+ if(perm('pat_voir'))patSuggest($('#cf-pat'))}
 async function encryptFor(pubJwk,obj){const pub=await crypto.subtle.importKey('jwk',pubJwk,{name:'RSA-OAEP',hash:'SHA-256'},false,['encrypt']);
  const k=await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt']);const iv=crypto.getRandomValues(new Uint8Array(12));
  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},k,new TextEncoder().encode(JSON.stringify(obj)));const raw=await crypto.subtle.exportKey('raw',k);
@@ -1461,17 +1552,26 @@ function mountRecettes(){const b=$('#caBody');const d=S.reDate||today();
  b.innerHTML=`<div class="row"><label class="f" style="flex-direction:row;align-items:center;gap:8px">Jour<input class="inp" type="date" id="reDate" value="${d}" style="width:auto"></label><span class="sp"></span><button class="btn ghost" data-act="reLoad">${ic('refresh')}Actualiser</button></div>
  <div id="reOut" class="stack"><div class="small muted">Déchiffrement…</div></div>`;
  $('#reDate').onchange=e=>{S.reDate=e.target.value||today();loadRecettes()};loadRecettes()}
+const REC_CACHE=new Map();
+async function decRec(id,u,x){const key=u+'/'+id+'/'+(x.modifie?.ts||0);if(REC_CACHE.has(key))return REC_CACHE.get(key);
+ const o={id,uid:u,ts:x.ts,date:x.date,patientId:x.patientId||null,...(await decryptEnt(x.enc))};if(x.modifie){o.modifie=x.modifie;try{if(x.encAvant)o.avant=(await decryptEnt(x.encAvant)).montant}catch(e){}}REC_CACHE.set(key,o);return o}
+async function fetchRecRange(from,to){const out=[];for(const u of members()){try{const s=await S.db.collection(`recettes/${u}/e`).where('date','>=',from).where('date','<=',to).get();
+ for(const doc of s.docs){try{out.push(await decRec(doc.id,u,doc.data()))}catch(e){if(e.message==='nokey')throw e;out.push({id:doc.id,uid:u,ts:doc.data().ts,date:doc.data().date,err:true,montant:0})}}}catch(e){if(e.message==='nokey')throw e;console.warn(e)}}return out.sort((a,b)=>a.ts-b.ts)}
 async function fetchRec(field,val){const out=[];for(const u of members()){try{const s=await S.db.collection(`recettes/${u}/e`).where(field,'==',val).get();
- for(const doc of s.docs){const x=doc.data();try{out.push({id:doc.id,uid:u,ts:x.ts,date:x.date,...(await decryptEnt(x.enc))})}catch(e){if(e.message==='nokey')throw e;out.push({id:doc.id,uid:u,ts:x.ts,date:x.date,err:true,montant:0})}}}catch(e){if(e.message==='nokey')throw e;console.warn(e)}}return out.sort((a,b)=>a.ts-b.ts)}
+ for(const doc of s.docs){const x=doc.data();try{out.push(await decRec(doc.id,u,x))}catch(e){if(e.message==='nokey')throw e;out.push({id:doc.id,uid:u,ts:x.ts,date:x.date,err:true,montant:0})}}}catch(e){if(e.message==='nokey')throw e;console.warn(e)}}return out.sort((a,b)=>a.ts-b.ts)}
 async function loadRecettes(){const o=$('#reOut');if(!o)return;if(!S.db||!S.cfg.caisse?.pub){o.innerHTML=`<div class="empty"><strong>Caisse non activée</strong>Activez-la depuis l'onglet « Saisir ».</div>`;return}
  const d=S.reDate||today(),m=d.slice(0,7);o.innerHTML='<div class="small muted">Déchiffrement des encaissements…</div>';
- let day,month;try{[day,month]=await Promise.all([fetchRec('date',d),fetchRec('mois',m)])}catch(e){o.innerHTML=`<div class="banner">La clé de la caisse est introuvable sur votre compte. Les encaissements ne peuvent pas être déchiffrés.</div>`;return}
+ const dt=new Date(d+'T12:00:00'),wk0=addDays(d,-((dt.getDay()+6)%7)),wk1=addDays(wk0,6);
+ let day,month,week;try{[day,month,week]=await Promise.all([fetchRec('date',d),fetchRec('mois',m),fetchRecRange(wk0,wk1)])}catch(e){o.innerHTML=`<div class="banner">La clé de la caisse est introuvable sur votre compte. Les encaissements ne peuvent pas être déchiffrés.</div>`;return}
  const sum=a=>a.reduce((t,x)=>t+(Number(x.montant)||0),0);const byMode=a=>Object.keys(MODES).map(k=>[k,sum(a.filter(x=>x.mode===k))]).filter(x=>x[1]);
  const perDay={};month.forEach(x=>perDay[x.date]=(perDay[x.date]||0)+(Number(x.montant)||0));const maxD=Math.max(1,...Object.values(perDay));
- o.innerHTML=`<div class="grid2"><div class="card kpi"><span class="eyebrow">${esc(fmtDate(d,{weekday:'long',day:'numeric',month:'long'}))}</span><b class="num">${MAD(sum(day))}</b><span class="small muted">${day.length} encaissement${day.length>1?'s':''}${byMode(day).length?' · '+byMode(day).map(([k,v])=>esc(MODES[k])+' '+MAD(v)).join(' · '):''}</span></div>
+ const yr=S.reYear&&S.reYear.y===d.slice(0,4)?S.reYear:null;
+ o.innerHTML=`<div class="grid2"><div class="card kpi"><span class="eyebrow">Semaine du ${esc(fmtDate(wk0,{day:'numeric',month:'short'}))} au ${esc(fmtDate(wk1,{day:'numeric',month:'short'}))}</span><b class="num">${MAD(sum(week))}</b><span class="small muted">${week.length} encaissement${week.length>1?'s':''}${byMode(week).length?' · '+byMode(week).map(([k,v])=>esc(MODES[k])+' '+MAD(v)).join(' · '):''}</span></div>
+ <div class="card kpi"><span class="eyebrow">Année ${esc(d.slice(0,4))}</span>${yr?`<b class="num">${MAD(yr.total)}</b><span class="small muted">${yr.n} encaissements · ${yr.mois.map(([k,v])=>esc(fmtMonth(k).split(' ')[0])+' '+MAD(v)).join(' · ')}</span>`:`<button class="btn ghost" data-act="reYear" style="align-self:flex-start">${ic('refresh')}Calculer le total de l'année</button>`}</div></div>
+ <div class="grid2"><div class="card kpi"><span class="eyebrow">${esc(fmtDate(d,{weekday:'long',day:'numeric',month:'long'}))}</span><b class="num">${MAD(sum(day))}</b><span class="small muted">${day.length} encaissement${day.length>1?'s':''}${byMode(day).length?' · '+byMode(day).map(([k,v])=>esc(MODES[k])+' '+MAD(v)).join(' · '):''}</span></div>
  <div class="card kpi"><span class="eyebrow">${esc(fmtMonth(m))}</span><b class="num">${MAD(sum(month))}</b><span class="small muted">${month.length} encaissement${month.length>1?'s':''} · moyenne ${MAD(Object.keys(perDay).length?sum(month)/Object.keys(perDay).length:0)} par jour travaillé</span></div></div>
  <div class="card"><h3 style="margin-bottom:8px">Détail du jour</h3>${day.length?`<div class="tablewrap"><table><thead><tr><th>Heure</th><th>Patient</th><th>Acte</th><th>Mode</th><th>Saisi par</th><th class="r">Montant</th><th></th></tr></thead><tbody>
- ${day.map(x=>`<tr><td class="num">${hm(x.ts)}</td><td>${x.err?'<span class="pill bad">Illisible</span>':esc(x.patient||'—')}</td><td>${esc(x.acte||'')}${x.note?`<div class="small muted">${esc(x.note)}</div>`:''}</td><td>${esc(MODES[x.mode]||'')}</td><td>${esc(nameOf(x.uid))}</td><td class="r num">${MAD(x.montant)}</td><td><button class="ib" data-act="reDel" data-u="${esc(x.uid)}" data-id="${esc(x.id)}" aria-label="Supprimer">${ic('trash')}</button></td></tr>`).join('')}
+ ${day.map(x=>`<tr><td class="num">${hm(x.ts)}</td><td>${x.err?'<span class="pill bad">Illisible</span>':esc(x.patient||'—')}</td><td>${esc(x.acte||'')}${x.note?`<div class="small muted">${esc(x.note)}</div>`:''}</td><td>${esc(MODES[x.mode]||'')}</td><td>${esc(nameOf(x.uid))}</td><td class="r num">${MAD(x.montant)}${x.modifie?`<div class="small" style="color:var(--bad)">corrigé${x.avant!=null?' (initial '+MAD(x.avant)+')':''} par ${esc(nameOf(x.modifie.by))} à ${hm(x.modifie.ts)}</div>`:''}</td><td><button class="ib" data-act="reDel" data-u="${esc(x.uid)}" data-id="${esc(x.id)}" aria-label="Supprimer">${ic('trash')}</button></td></tr>`).join('')}
  </tbody></table></div>`:`<div class="empty"><strong>Aucun encaissement ce jour</strong>Les saisies de l'accueil apparaissent ici.</div>`}</div>
  ${Object.keys(perDay).length?`<div class="card"><h3 style="margin-bottom:8px">Jours du mois</h3><div class="list">${Object.keys(perDay).sort().reverse().map(k=>`<div class="li" style="cursor:pointer" data-act="rePick" data-d="${k}"><span style="width:9ch" class="small">${esc(fmtDate(k,{weekday:'short',day:'numeric'}))}</span><div class="grow"><div class="progress"><i style="width:${Math.round(perDay[k]/maxD*100)}%"></i></div></div><span class="num" style="min-width:12ch;text-align:right">${MAD(perDay[k])}</span></div>`).join('')}</div></div>`:''}`}
 
@@ -1479,19 +1579,19 @@ async function loadRecettes(){const o=$('#reOut');if(!o)return;if(!S.db||!S.cfg.
 Views.pointage={
  mount(el){el.innerHTML=`<div class="stack"><div><div class="eyebrow">Présences</div><h1>Pointage</h1></div>${banners()}<div id="ptMine"></div>
  <div class="card"><h3 style="margin-bottom:6px">Mes 30 derniers jours</h3><div id="ptHist" class="small muted">Chargement…</div></div>
- ${S.isOwner?`<div class="card stack" style="gap:10px"><h3>Position du cabinet</h3><div class="small muted">Les membres ne peuvent pointer leur arrivée et leur départ que s'ils se trouvent dans ce rayon autour du cabinet (vérification GPS). Votre propre pointage n'est pas limité.</div>
+ ${S.isOwner?`<div class="card stack" style="gap:10px"><h3>Position du cabinet</h3><div class="small muted">Hors de ce rayon (ou sans GPS), les membres n'ont accès qu'aux groupes de discussion : agenda, patients, stock, caisse, pointage… sont bloqués. Votre compte n'est jamais limité. La précision du GPS en intérieur est de 10 à 30 m : une marge de 30 m est ajoutée au rayon.</div>
   <div id="ptCab"></div></div>
   <div class="card stack" style="gap:10px"><div class="row"><h3>Équipe</h3><span class="sp"></span><input class="inp" type="date" id="ptDate" value="${S.ptDate||today()}" style="width:auto" aria-label="Jour"><button class="ib" data-act="ptLoad" aria-label="Actualiser">${ic('refresh')}</button></div><div id="ptTeam" class="small muted">Chargement…</div></div>`:''}</div>`;
   if(S.isOwner)$('#ptDate').onchange=e=>{S.ptDate=e.target.value||today();loadTeam()};loadMyHist();if(S.isOwner)loadTeam()},
- updCab(){const b=$('#ptCab');if(!b)return;const c=S.cfg.cabinet;b.innerHTML=`${c?.lat!=null?`<div class="banner info">${ic('check')}Position enregistrée (${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}), rayon ${esc(c.rayon||150)} m. <a href="https://maps.google.com/?q=${c.lat},${c.lng}" target="_blank" rel="noopener">Voir sur la carte</a></div>`:`<div class="banner warn">${ic('alert')}Position non définie : le pointage n'est pas encore limité au cabinet.</div>`}
-  <div class="row" style="gap:8px;flex-wrap:wrap"><label class="f" style="width:140px">Rayon (mètres)<input class="inp" type="number" min="30" max="2000" step="10" id="ptRayon" value="${esc(c?.rayon||150)}"></label><span class="sp"></span><button class="btn pri" data-act="ptSetCab">${ic('refresh')}Enregistrer ma position actuelle comme cabinet</button>${c?.lat!=null?`<button class="btn ghost" data-act="ptRayon">Modifier le rayon</button>`:''}</div>`},
+ updCab(){const b=$('#ptCab');if(!b)return;const c=S.cfg.cabinet;b.innerHTML=`${c?.lat!=null?`<div class="banner info">${ic('check')}Position enregistrée (${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}), rayon ${esc(c.rayon||10)} m. <a href="https://maps.google.com/?q=${c.lat},${c.lng}" target="_blank" rel="noopener">Voir sur la carte</a></div>`:`<div class="banner warn">${ic('alert')}Position non définie : le pointage n'est pas encore limité au cabinet.</div>`}
+  <div class="row" style="gap:8px;flex-wrap:wrap"><label class="f" style="width:140px">Rayon (mètres)<input class="inp" type="number" min="5" max="2000" step="5" id="ptRayon" value="${esc(c?.rayon||10)}"></label><span class="sp"></span><button class="btn pri" data-act="ptSetCab">${ic('refresh')}Enregistrer ma position actuelle comme cabinet</button>${c?.lat!=null?`<button class="btn ghost" data-act="ptRayon">Modifier le rayon</button>`:''}</div>`},
  update(){Views.pointage.updCab();const b=$('#ptMine');if(!b)return;const st=ptState(S.myPointage);
   b.innerHTML=`<div class="clock"><div class="bigtime">${nowHM()}</div><div class="st">${st.sessions.length?st.sessions.map(s=>`${hm(s.in)} → ${s.out?hm(s.out):'en cours'}`).join(' · ')+` · total ${dur(st.total)}`:'Pas encore de pointage aujourd\'hui.'}</div>
   <button class="btn big" data-act="pointer">${ic('clock')}${st.inside?'Pointer le départ':'Pointer l\'arrivée'}</button>${S.cfg.cabinet?.lat!=null&&!S.isOwner?'<div class="small" style="opacity:.8;margin-top:8px">Pointage possible uniquement au cabinet (position vérifiée).</div>':''}</div>`}};
 async function ptSetCab(){if(!await ask('Enregistrer votre position actuelle comme position du cabinet ? Faites-le à l\'intérieur du cabinet.','Enregistrer'))return;
  toast('Localisation en cours…');let c;try{c=await getPos()}catch(e){toast(geoErr(e),'err');return}
  if(c.accuracy>80)toast('Précision faible ('+Math.round(c.accuracy)+' m). Si possible, réessayez avec le Wi-Fi activé.','err');
- const rayon=Math.max(30,Math.min(2000,Number($('#ptRayon')?.value)||150));
+ const rayon=Math.max(5,Math.min(2000,Number($('#ptRayon')?.value)||10));
  W(()=>S.db.doc('cfg/cabinet').set({lat:c.latitude,lng:c.longitude,rayon,precision:Math.round(c.accuracy),maj:Date.now()}),'Position du cabinet enregistrée')}
 async function loadMyHist(){const h=$('#ptHist');if(!h)return;if(!S.db||!S.uid){h.textContent='Indisponible.';return}
  try{const s=await S.db.collection(`pointage/${S.uid}/j`).orderBy('date','desc').limit(30).get();const rows=s.docs.map(d=>d.data());
@@ -1625,7 +1725,7 @@ async function purge(k){const conf={messages:['ts',180,'les messages de plus de 
   toast(n?`${n} élément${n>1?'s':''} supprimé${n>1?'s':''}`+(n===300?' (relancez pour continuer)':''):'Rien à supprimer')}catch(e){console.warn(e);toast(errMsg(e),'err')}}
 
 /* ---------- actions ---------- */
-const Acts={
+const Acts={siteRetry:()=>{setSite('checking');if(siteWatch!=null){navigator.geolocation.clearWatch(siteWatch);siteWatch=null}startSite()},
  more:openMore,pointer,
  startTpl:a=>{if(perm('mod_checklists'))startTpl(a.dataset.id)},
  resumeRun:a=>{S.run=a.dataset.id;S.runLocal=null;go('checklists')},
@@ -1639,7 +1739,7 @@ const Acts={
  agShift:a=>{S.agDate=addDays(S.agDate,Number(a.dataset.n));subRdvSel();refresh('agenda')},
  agToday:()=>{S.agDate=today();subRdvSel();refresh('agenda')},
  agPick:a=>{S.agDate=a.dataset.d;subRdvSel();refresh('agenda')},
- rdvNew:()=>rdvModal(),rdvEdit:a=>rdvModal(S.rdvSel.find(r=>r.id===a.dataset.id)),
+ rdvNew:()=>rdvModal(),rdvEdit:a=>rdvModal(S.rdvSel.find(r=>r.id===a.dataset.id)),rdvMenu:a=>rdvMenu(a.dataset.id),soinTypes:()=>soinTypesEdit(),
  openGroup:a=>openGroup(a.dataset.id),closeGroup:()=>{leaveGroup();go('groupes')},
  sendTxt:async()=>{const ta=$('#msgtxt');const t=ta.value.trim();if(!t)return;ta.value='';ta.style.height='auto';ls.set('ns_draft_'+S.grp,'');if(!await postMsg({type:'text',texte:t}))ta.value=t},
  pickImg:()=>$('#imgfile').click(),pickAud:()=>startRec(),
@@ -1647,10 +1747,10 @@ const Acts={
   const ok=await W(()=>S.db.doc('messages/'+a.dataset.id).delete());if(ok&&m?.asset&&S.assets){try{await S.assets.delete(m.asset)}catch(e){}}},
  zoom:a=>{openModal({title:'Photo',ok:null,cancel:'Fermer',body:`<img src="${esc(a.getAttribute('src'))}" alt="${esc(a.alt)}" style="width:100%;border-radius:10px">`})},
  stockEdit:a=>{if(perm('stock_edit'))stockEdit(a.dataset.id)},qty:a=>changeQty(a.dataset.id,Number(a.dataset.n)),
- stFilter:a=>{S.stockFilter=a.dataset.k;S.stockQ='';const q=$('#stq');if(q)q.value='';stockUpdate();window.scrollTo(0,0)},stockCatalog:a=>stockCatalog(a.dataset.k),ptSetCab,ptRayon:()=>{const r=Math.max(30,Math.min(2000,Number($('#ptRayon')?.value)||150));W(()=>S.db.doc('cfg/cabinet').update({rayon:r}),'Rayon : '+r+' m')},scanIn:()=>{S.scanMode='in';scanModal()},scanOut:()=>{S.scanMode='out';scanModal()},stockLow:()=>{S.stockFilter='bas';go('stock')},orderList,
+ stFilter:a=>{S.stockFilter=a.dataset.k;S.stockQ='';const q=$('#stq');if(q)q.value='';stockUpdate();window.scrollTo(0,0)},stockCatalog:a=>stockCatalog(a.dataset.k),ptSetCab,ptRayon:()=>{const r=Math.max(5,Math.min(2000,Number($('#ptRayon')?.value)||10));W(()=>S.db.doc('cfg/cabinet').update({rayon:r}),'Rayon : '+r+' m')},scanIn:()=>{S.scanMode='in';scanModal()},scanOut:()=>{S.scanMode='out';scanModal()},stockLow:()=>{S.stockFilter='bas';go('stock')},orderList,
  caTab:a=>{S.caisseTab=a.dataset.t;go('caisse')},caActivate,reLoad:loadRecettes,
  rePick:a=>{S.reDate=a.dataset.d;const i=$('#reDate');if(i)i.value=a.dataset.d;loadRecettes();window.scrollTo(0,0)},
- reDel:async a=>{if(!await ask('Supprimer cet encaissement ?','Supprimer'))return;if(await W(()=>S.db.doc(`recettes/${a.dataset.u}/e/${a.dataset.id}`).delete(),'Encaissement supprimé'))loadRecettes()},
+ caFix:a=>caFix(a.dataset.id),reYear:async a=>{a.disabled=true;a.textContent='Déchiffrement de l\'année…';const y=(S.reDate||today()).slice(0,4);try{const L=await fetchRecRange(y+'-01-01',y+'-12-31');const pm={};L.forEach(x=>pm[x.date.slice(0,7)]=(pm[x.date.slice(0,7)]||0)+(Number(x.montant)||0));S.reYear={y,n:L.length,total:L.reduce((t,x)=>t+(Number(x.montant)||0),0),mois:Object.entries(pm).sort()};loadRecettes()}catch(e){toast('Calcul impossible.','err');a.disabled=false}},reDel:async a=>{if(!await ask('Supprimer cet encaissement ?','Supprimer'))return;if(await W(()=>S.db.doc(`recettes/${a.dataset.u}/e/${a.dataset.id}`).delete(),'Encaissement supprimé'))loadRecettes()},
  ptLoad:loadTeam,regEdit,regAccept:()=>W(()=>S.db.doc('annuaire/'+S.uid).update({reglementLu:S.cfg.reglement.version}),'Merci, acceptation enregistrée'),
  grpEdit:a=>grpEdit(a.dataset.id),
  memPerms:a=>memPerms(a.dataset.u),histImport:()=>$('#histfile').click(),histAll:()=>{S.histAll=true;updatePatient()},rdvAll:()=>{S.rdvAll=true;updatePatient()},patImport:()=>$('#impfile').click(),syncAgenda:a=>syncAgenda(a),authMode:a=>{S.authMode=a.dataset.m;go('attente')},
@@ -1705,14 +1805,14 @@ function notifCard(){if(!('Notification' in window)&&!isIOS)return '';const st=(
 Acts.enableNotif=enableNotif;Acts.notifHide=()=>{ls.set('ns_notif_hide',1);refresh('accueil')};
 function addSub(fn){S.dataSubs.push(fn)}
 function stopData(){(S.dataSubs||[]).forEach(f=>{try{f()}catch(e){}});S.dataSubs=[];S.subs.rdvSel?.();S.subs.rdvSel=null;S.dataStarted=false}
-function startData(){if(S.dataStarted||gated())return;S.dataStarted=true;const db=S.db;const w=e=>console.warn(e);
- if(perm('rdv_voir')){addSub(db.collection('rdv').where('date','==',today()).onSnapshot(s=>{S.rdvToday=s.docs.map(d=>({id:d.id,...d.data()}));refresh('accueil')},w));subRdvSel()}
+function startData(){if(S.dataStarted||gated())return;S.dataStarted=true;const db=S.db;const w=e=>console.warn(e);startSite();
+ if(perm('rdv_voir')||perm('rdv_jour')){addSub(db.collection('rdv').where('date','==',today()).onSnapshot(s=>{S.rdvToday=s.docs.map(d=>({id:d.id,...d.data()}));refresh('accueil')},w));addSub(db.collection('rdv').where('date','==',addDays(today(),1)).onSnapshot(s=>{S.rdvTomorrow=s.docs.map(d=>({id:d.id,...d.data()}));refresh('accueil')},w));subRdvSel()}
  if(perm('mod_groupes')){const acc={};myGroups().forEach(g=>addSub(db.collection('messages').where('groupe','==',g.id).orderBy('ts','desc').limit(20).onSnapshot(s=>{acc[g.id]=s.docs.map(d=>({id:d.id,...d.data()}));S.latest=Object.values(acc).flat().sort((a,b)=>b.ts-a.ts);refresh('accueil','groupes')},w)))}
  if(perm('mod_stock')||perm('labo_voir'))addSub(db.collection('stock').onSnapshot(s=>{S.stock=s.docs.map(d=>({id:d.id,...d.data()}));refresh('stock','accueil','labo')},w));
  if(perm('labo_voir'))addSub(db.collection('labo').orderBy('maj','desc').limit(500).onSnapshot(s=>{S.labo=s.docs.map(d=>({id:d.id,...d.data()}));refresh('labo','accueil','patients');const P=$('#labPhotos');if(P){const c=S.labo.find(x=>x.id===P.dataset.id);if(c)P.innerHTML=labPhotosHTML(c)}},w));
  if(perm('mod_checklists'))addSub(db.collection('executions').where('date','==',today()).onSnapshot(s=>{S.execToday=s.docs.map(d=>({id:d.id,...d.data()}));refresh('checklists','accueil')},w));
  if(perm('mod_pointage'))addSub(db.doc(`pointage/${S.uid}/j/${today()}`).onSnapshot(s=>{S.myPointage=s.exists?s.data():null;refresh('accueil','pointage')},w));
- if(perm('caisse'))addSub(db.collection(`recettes/${S.uid}/e`).where('date','==',today()).onSnapshot(s=>{S.myRecCount=s.size;refresh('caisse')},w));
+ if(perm('caisse'))addSub(db.collection(`recettes/${S.uid}/e`).where('date','==',today()).onSnapshot(s=>{S.myRecCount=s.size;S.myRec=s.docs.map(d=>({id:d.id,...d.data()}));refresh('caisse')},w));
  refresh();notifSilent()}
 function restartData(){stopData();S.rdvToday=[];S.latest=[];S.stock=[];S.labo=[];S.execToday=[];startData()}
 let membresAllSub=null;
@@ -1746,7 +1846,7 @@ async function boot(){
   S.ready=true;renderMe();
   if(S.adminUnverified){go('attente');return}
   if(S.pendingSignup){const p=S.pendingSignup;S.pendingSignup=null;try{await db.doc('annuaire/'+u.uid).set({nom:p.nom,email:p.email,roleSouhaite:p.role,demandeLe:Date.now(),premiere:Date.now(),derniere:today()})}catch(e){console.warn(e)}}
-  db.collection('cfg').onSnapshot(s=>{const c={};s.docs.forEach(d=>c[d.id]=d.data());const oldG=JSON.stringify(myGroups().map(g=>g.id));S.cfg=c;S.cfgLoaded=true;renderMe();
+  db.collection('cfg').onSnapshot(s=>{const c={};s.docs.forEach(d=>c[d.id]=d.data());const oldG=JSON.stringify(myGroups().map(g=>g.id));S.cfg=c;S.cfgLoaded=true;if(S.dataStarted)startSite();renderMe();
    if(S.dataStarted&&JSON.stringify(myGroups().map(g=>g.id))!==oldG)restartData();
    if(S.view==='attente'||gated()||!allowedView(S.view)){reroute()}else if(S.view==='caisse'&&(S.caisseTab||'saisie')==='saisie'&&!!c.caisse?.pub!==!!$('#caForm')&&!document.activeElement?.closest?.('#caForm')){go('caisse')}else refresh();if(!gated()&&!S.dataStarted)startData()},e=>{console.warn(e);S.cfgLoaded=true;reroute()});
   db.collection('annuaire').onSnapshot(s=>{const a={};s.docs.forEach(d=>a[d.id]=d.data());S.annuaire=a;S.annuaireLoaded=true;resolveProfiles();if(S.view==='attente'||gated())reroute()},e=>{console.warn(e);S.annuaireLoaded=true;reroute()});
