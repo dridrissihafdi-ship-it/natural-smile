@@ -200,6 +200,8 @@ td.r,th.r{text-align:right}
 .legend .lg{display:inline-flex;align-items:center;gap:5px}.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
 .rdv{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;transition:background .2s}.rdv.pressing{background:var(--accent-soft);border-radius:12px}
 .alprog{display:flex;flex-direction:column;gap:6px;margin:8px 0 2px}.alprog .bar{height:6px;border-radius:9px;background:var(--line);overflow:hidden}.alprog .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold-1),var(--gold-2))}
+.hrow{display:flex;flex-direction:column;gap:4px}.hrow input[type=time]{width:auto;min-width:96px;padding:8px}
+.demo-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:2px solid var(--gold-2)}.demo-bar>svg{width:22px;height:22px}
 .site-lock{display:flex;gap:10px;align-items:center}.site-lock>svg{width:22px;height:22px;flex:none}
 .menu-list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .menu-it{display:flex;align-items:center;gap:12px;padding:14px;border:0;border-bottom:1px solid var(--line);background:var(--surface);font:inherit;font-weight:600;color:var(--fg);cursor:pointer;text-align:left}
@@ -409,7 +411,7 @@ const I={
  box:'<path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/>',
  cash:'<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9v6M18 9v6"/>',
  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
- book:'<path d="M4 4h6a2 2 0 012 2v14a2 2 0 00-2-2H4z"/><path d="M20 4h-6a2 2 0 00-2 2v14a2 2 0 012-2h6z"/>',
+ chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',book:'<path d="M4 4h6a2 2 0 012 2v14a2 2 0 00-2-2H4z"/><path d="M20 4h-6a2 2 0 00-2 2v14a2 2 0 012-2h6z"/>',
  users:'<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><path d="M16 4.5a3.5 3.5 0 010 7M22 20c0-3-2-5-5-5.7"/>',
  plus:'<path d="M12 5v14M5 12h14"/>',scan:'<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8v8M10 8v8M14 8v8M17 8v8"/>',minus:'<path d="M5 12h14"/>',
  x:'<path d="M6 6l12 12M18 6L6 18"/>',
@@ -545,12 +547,15 @@ const S={db:null,user:null,assets:null,uid:null,isOwner:false,me:null,canWrite:n
  view:'accueil',cfg:{},annuaire:{},prof:{},rdvToday:[],rdvSel:[],agDate:today(),stock:[],stockLocal:{},
  execToday:[],latest:[],labo:[],grp:null,grpMsgs:[],run:null,runLocal:null,myPointage:null,myRecCount:0,stockFilter:'tous',stockQ:'',
  subs:{},privKey:null};
+/* Mode démo : le Docteur voit l'application avec les droits d'un membre (lecture seule). */
+S._owner=false;S.demo=null;Object.defineProperty(S,'isOwner',{get(){return S._owner&&!S.demo},set(v){S._owner=!!v},configurable:true});
+const meUid=()=>S.demo||S.uid;
 const lastSeen=ls.get('ns_seen',{});
 
 const groups=()=>(S.cfg.groupes?.liste?.length?S.cfg.groupes.liste:DEF_GROUPS);
 const templates=()=>(S.cfg.checklists?.liste?.length?S.cfg.checklists.liste:DEF_CL);
 const reglement=()=>(S.cfg.reglement?.articles?.length?S.cfg.reglement.articles:DEF_REGLEMENT);
-const MODULES=[['rdv_voir','Agenda complet'],['rdv_jour','Rendez-vous du jour uniquement (photos, radios, soins, notes)'],['pat_voir','Dossiers patients'],['labo_voir','Laboratoire'],['mod_groupes','Groupes de discussion'],['mod_checklists','Checklists'],['mod_stock','Stock du cabinet'],['caisse','Caisse (saisie des encaissements, sans voir les totaux)'],['mod_pointage','Pointage'],['mod_reglement','Règlement intérieur']];
+const MODULES=[['pat_liste','Liste des patients (noms et téléphones, sans dossier médical)'],['rdv_voir','Agenda complet'],['rdv_jour','Rendez-vous du jour uniquement (photos, radios, soins, notes)'],['pat_voir','Dossiers patients'],['labo_voir','Laboratoire'],['mod_groupes','Groupes de discussion'],['mod_checklists','Checklists'],['mod_stock','Stock du cabinet'],['caisse','Caisse (saisie des encaissements, sans voir les totaux)'],['mod_pointage','Pointage'],['mod_reglement','Règlement intérieur']];
 const ACTIONS=[['rdv_gerer','Ajouter et modifier des rendez-vous'],['rdv_suppr','Supprimer des rendez-vous'],['pat_edit','Créer et modifier les fiches patients'],['pat_docs','Ajouter des radios et des photos'],['pat_suppr','Supprimer des patients et des fichiers'],['stock_edit','Modifier le stock du cabinet'],['labo_gerer','Créer et suivre les travaux du laboratoire, gérer son stock'],['caisse_edit','Corriger ses encaissements du jour (sans voir les totaux)']];
 const PERMS=[...MODULES,...ACTIONS];
 const DEF_ON=['mod_groupes','mod_checklists','mod_stock','mod_pointage','mod_reglement'];
@@ -559,14 +564,14 @@ const PRESETS={dentiste:['rdv_voir','rdv_gerer','rdv_suppr','pat_voir','pat_edit
 const presetPerms=r=>{const o={};PERMS.forEach(([k])=>o[k]=(PRESETS[r]||[]).includes(k)||DEF_ON.includes(k));return o};
 const memberOf=u=>S.membres[u]||null;
 const statutOf=u=>memberOf(u)?.statut||'attente';
-const rawPerm=p=>{if(S.isOwner)return true;const m=memberOf(S.uid);if(!m||m.statut!=='actif')return false;const v=m.perms?.[p];return v===undefined?DEF_ON.includes(p):!!v};
+const rawPerm=p=>{if(S.isOwner)return true;const m=memberOf(meUid());if(!m||m.statut!=='actif')return false;const v=m.perms?.[p];return v===undefined?DEF_ON.includes(p):!!v};
 /* Hors du cabinet (GPS), seuls les groupes de discussion restent accessibles. Le compte du Docteur n'est jamais limité. */
-const siteLock=()=>!S.isOwner&&S.cfg?.cabinet?.lat!=null&&S.site!=='in';
+const siteLock=()=>S.demo?S.demoSite==='out':(!S.isOwner&&S.cfg?.cabinet?.lat!=null&&S.site!=='in');
 const perm=p=>rawPerm(p)&&(p==='mod_groupes'||!siteLock());
-const myGroups=()=>{if(S.isOwner)return groups();const g=memberOf(S.uid)?.groupes;return Array.isArray(g)?groups().filter(x=>g.includes(x.id)):groups()};
+const myGroups=()=>{if(S.isOwner)return groups();const g=memberOf(meUid())?.groupes;return Array.isArray(g)?groups().filter(x=>g.includes(x.id)):groups()};
 const roleOf=u=>(u===S.uid&&S.isOwner)?'dentiste':(memberOf(u)?.role||'');
 const teamMembers=()=>members().filter(u=>(u===S.uid&&S.isOwner)||statutOf(u)==='actif');
-function gated(){if(S.isOwner)return false;return !S.ready||!S.authUser||S.adminUnverified||!S.cfgLoaded||!S.annuaireLoaded||!S.membreLoaded||statutOf(S.uid)!=='actif'}
+function gated(){if(S._owner)return false;return !S.ready||!S.authUser||S.adminUnverified||!S.cfgLoaded||!S.annuaireLoaded||!S.membreLoaded||statutOf(S.uid)!=='actif'}
 async function logout(){try{const t=ls.get('ns_push_token','');if(t&&S.db&&S.uid)await S.db.doc('tokens/'+S.uid).set({list:firebase.firestore.FieldValue.arrayRemove(t)},{merge:true});ls.set('ns_push_token','')}catch(e){}try{await firebase.auth().signOut()}catch(e){}location.reload()}
 function reroute(){if(document.activeElement?.closest?.('#gateForm'))return;if(S.view==='attente'||gated()||!allowedView(S.view))go(S.view==='attente'?'accueil':S.view)}
 const ADMINS=(window.NS_CONFIG?.adminEmails||[]).map(e=>String(e).toLowerCase());
@@ -609,7 +614,7 @@ function errMsg(e){const c=e&&e.code;
  if(c==='resource_exhausted'||c==='rate_limited')return 'Trop d\'actions d\'un coup. Attendez quelques secondes.';
  if(c==='too_large')return 'Fichier trop volumineux (20 Mo maximum).';
  return 'L\'enregistrement a échoué. Vérifiez la connexion et réessayez.'}
-async function W(fn,ok){if(!S.db){toast('Connexion au serveur impossible.','err');return false}
+async function W(fn,ok){if(S.demo){toast('Mode démo : aucune modification n\'est enregistrée.','err');return false}if(!S.db){toast('Connexion au serveur impossible.','err');return false}
  try{await fn();if(ok)toast(ok);return true}catch(e){console.warn(e);toast(errMsg(e),'err');return false}}
 
 function openModal({title,body,ok='Enregistrer',onOk,del,onDel,cancel='Annuler'}){
@@ -630,7 +635,7 @@ function ask(msg,yes){return new Promise(res=>{const d=$('#ask');
 const NAV=[
  {id:'accueil',lbl:'Accueil',ic:'home',bar:1},
  {id:'agenda',lbl:'Agenda',ic:'cal',bar:1,short:'Agenda',show:()=>perm('rdv_voir')||perm('rdv_jour')},
- {id:'patients',lbl:'Patients',ic:'folder',bar:1,short:'Patients',show:()=>perm('pat_voir')},
+ {id:'patients',lbl:'Patients',ic:'folder',bar:1,short:'Patients',show:()=>perm('pat_voir')||perm('pat_liste')},
  {id:'groupes',lbl:'Groupes',ic:'chat',bar:1,short:'Groupes',show:()=>perm('mod_groupes')},
  {id:'checklists',lbl:'Checklists',ic:'check',bar:1,short:'Checklists',show:()=>perm('mod_checklists')},
  {id:'labo',lbl:'Laboratoire',ic:'lab',short:'Labo',show:()=>perm('labo_voir')},
@@ -638,6 +643,7 @@ const NAV=[
  {id:'caisse',lbl:'Caisse',ic:'cash',show:canCaisse,short:'Caisse'},
  {id:'pointage',lbl:'Pointage',ic:'clock',short:'Pointage',show:()=>perm('mod_pointage')},
  {id:'reglement',lbl:'Règlement intérieur',ic:'book',short:'Règlement',show:()=>perm('mod_reglement')},
+ {id:'rapports',lbl:'Rapports du jour',ic:'chart',short:'Rapports',show:()=>S.isOwner},
  {id:'equipe',lbl:()=>S.isOwner?'Équipe & accès':'Mon profil',ic:()=>S.isOwner?'shield':'users',short:()=>S.isOwner?'Accès':'Profil'}
 ];
 const lbl=n=>typeof n.lbl==='function'?n.lbl():n.lbl;
@@ -666,6 +672,27 @@ function refresh(...vs){if(!vs.length||vs.includes(S.view))Views[S.view].update?
 document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g){e.preventDefault();go(g.dataset.go);return}
  const a=e.target.closest('[data-act]');if(a&&Acts[a.dataset.act]){Acts[a.dataset.act](a,e)}});
 
+/* ---------- horaires de travail ---------- */
+const JOURS=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+const DEF_HORAIRES={tol:10,jours:{'0':[],'1':[['08:30','16:00']],'2':[['08:30','13:30'],['14:30','19:00']],'3':[['08:30','13:30'],['14:30','19:00']],'4':[['08:30','16:00']],'5':[['08:30','13:30'],['14:30','19:00']],'6':[['08:30','13:00']]}};
+const horaires=()=>{const h=S.cfg?.horaires;return h?.jours?h:DEF_HORAIRES};
+const slotsOf=date=>{const j=horaires().jours[String(new Date(date+'T12:00:00').getDay())];return Array.isArray(j)?j.filter(x=>x&&x[0]&&x[1]):[]};
+const toMin=t=>{const[a,b]=String(t).split(':').map(Number);return a*60+(b||0)};
+const minOf=ts=>{const d=new Date(ts);return d.getHours()*60+d.getMinutes()};
+const slotsTxt=sl=>sl.length?sl.map(x=>x[0]+'–'+x[1]).join(' · '):'Repos';
+const prevuMs=date=>slotsOf(date).reduce((t,x)=>t+(toMin(x[1])-toMin(x[0]))*60000,0);
+function ptEcarts(date,p){const sl=slotsOf(date),st=ptState(p),tol=Number(horaires().tol)||0,o={retard:0,avance:0};if(!sl.length||!st.first)return o;
+ const r=minOf(st.first)-toMin(sl[0][0]);if(r>tol)o.retard=r;
+ if(st.last?.out&&!st.inside){const a=toMin(sl[sl.length-1][1])-minOf(st.last.out);if(a>tol)o.avance=a}return o}
+const ecartPills=(date,p)=>{const e=ptEcarts(date,p);return (e.retard?` <span class="pill bad">retard ${e.retard} min</span>`:'')+(e.avance?` <span class="pill warn">départ anticipé ${e.avance} min</span>`:'')};
+function horairesEdit(){if(!S.isOwner)return;const H=horaires();const row=k=>{const sl=H.jours[k]||[];const v=(i,j)=>esc(sl[i]?.[j]||'');
+  return `<div class="hrow"><b>${JOURS[k]}</b><div class="row" style="gap:6px;flex-wrap:wrap"><input class="inp" type="time" name="a${k}" value="${v(0,0)}"><span>→</span><input class="inp" type="time" name="b${k}" value="${v(0,1)}"><span class="small muted">puis</span><input class="inp" type="time" name="c${k}" value="${v(1,0)}"><span>→</span><input class="inp" type="time" name="d${k}" value="${v(1,1)}"></div></div>`};
+ openModal({title:'Horaires de travail',body:`<div class="small muted">Laissez vide pour un jour de repos. Pour un horaire continu, remplissez seulement la première plage.</div>
+  <div class="stack" style="gap:10px">${[1,2,3,4,5,6,0].map(row).join('')}</div>
+  <label class="f" style="max-width:220px">Tolérance de retard (minutes)<input class="inp" type="number" min="0" max="60" name="tol" value="${esc(H.tol??10)}"></label>`,
+ onOk:f=>{const jours={};for(let k=0;k<7;k++){const sl=[];if(f['a'+k]&&f['b'+k])sl.push([f['a'+k],f['b'+k]]);if(f['c'+k]&&f['d'+k])sl.push([f['c'+k],f['d'+k]]);
+   for(const x of sl)if(toMin(x[1])<=toMin(x[0])){toast(JOURS[k]+' : l\'heure de fin doit suivre l\'heure de début.','err');return false}jours[k]=sl}
+  return W(()=>S.db.doc('cfg/horaires').set({jours,tol:Math.max(0,Number(f.tol)||0),maj:Date.now()}),'Horaires enregistrés')}})}
 /* ---------- pointage helpers ---------- */
 function ptState(p){const s=p?.sessions||[];const last=s[s.length-1];return {sessions:s,inside:!!(last&&!last.out),first:s[0]?.in,last,
  total:s.reduce((t,x)=>t+((x.out||Date.now())-x.in),0)}}
@@ -679,6 +706,8 @@ async function pointer(){
   const d=Math.round(distM(cab,{lat:c.latitude,lng:c.longitude})),acc=Math.round(c.accuracy||0),R=Number(cab.rayon)||10;
   if(d-Math.min(acc,SITE_TOL)>R){toast(`Pointage impossible : vous êtes à ${d>=1000?(d/1000).toFixed(1)+' km':d+' m'} du cabinet. Le pointage se fait uniquement au cabinet.`,'err');return}
   loc={d,acc}}
+ {const sl=slotsOf(today()),n=minOf(Date.now());const ok=sl.length&&n>=toMin(sl[0][0])-60&&n<=toMin(sl[sl.length-1][1])+60;
+  if(!ok&&!await ask(sl.length?`Vous êtes en dehors des horaires du jour (${slotsTxt(sl)}). Pointer quand même ?`:'Aujourd\'hui est un jour de repos. Pointer quand même ?','Pointer'))return;if(!ok)loc={...(loc||{}),hors:true}}
  const st=ptState(S.myPointage);const sess=st.sessions.map(x=>({...x}));let msg;
  if(st.inside){const l=sess[sess.length-1];l.out=Date.now();if(loc)l.outLoc=loc;msg='Départ enregistré à '+nowHM()}else{sess.push({in:Date.now(),out:null,...(loc?{inLoc:loc}:{})});msg='Arrivée enregistrée à '+nowHM()}
  await W(()=>S.db.doc(`pointage/${S.uid}/j/${today()}`).set({date:today(),mois:today().slice(0,7),sessions:sess}),msg);
@@ -704,7 +733,7 @@ Views.accueil={update(el){
  const doneTpl=id=>S.execToday.find(x=>x.tpl===id&&x.fin);
  const h=new Date().getHours();const hi=h<12?'Bonjour':h<18?'Bon après-midi':'Bonsoir';
  const mods=NAV.filter(n=>n.id!=='accueil'&&(!n.show||n.show()));
- const fn=S.uid?firstName(nameOf(S.uid)):'';
+ const fn=S.uid?firstName(nameOf(meUid())):'';
  el.innerHTML=`<div class="stack">
  <div class="greet"><div><h1>${hi}${fn&&fn!=='Membre'?', '+esc(fn):''}</h1><div class="muted">${esc(capFirst(fmtDate(today())))}</div></div></div>
  ${banners()}
@@ -745,6 +774,10 @@ Views.accueil={update(el){
 }};
 /* ---- Présence au cabinet (GPS) ---- */
 const SITE_TOL=30;
+function demoBanner(){return `<div class="banner info demo-bar">${ic('users')}<div style="flex:1"><b>Mode démo : ${esc(nameOf(S.demo))}</b><div class="small">${esc(ROLES[memberOf(S.demo)?.role]||'')} — vous voyez exactement ce que voit ce membre. Rien n'est enregistré.</div></div>
+ <button class="btn ghost" data-act="demoSite">${S.demoSite==='out'?'Simuler : au cabinet':'Simuler : hors cabinet'}</button><button class="btn pri" data-act="demoExit">Quitter la démo</button></div>`}
+function demoStart(u){if(!S._owner)return;S.demo=u;S.demoSite='in';$('#dlg')?.open&&$('#dlg').close();restartData();renderNav();go('accueil');toast('Démo : '+nameOf(u))}
+function demoExit(){S.demo=null;restartData();renderNav();go('equipe')}
 function siteBanner(){const st=S.site||'checking',c=S.siteInfo||{};
  const why=st==='checking'?'Vérification de votre position…':st==='nogps'?(c.msg||'La localisation est désactivée ou indisponible sur cet appareil.'):`Vous êtes à ${c.d>=1000?(c.d/1000).toFixed(1)+' km':Math.round(c.d||0)+' m'} du cabinet.`;
  return `<div class="banner warn site-lock">${ic('lock')}<div style="flex:1"><b>Fonctionnalités disponibles uniquement au cabinet.</b><div class="small">${esc(why)} Hors du cabinet, seuls les groupes de discussion restent accessibles.</div></div>${st==='checking'?'':`<button class="btn ghost" data-act="siteRetry">Réessayer</button>`}</div>`}
@@ -753,7 +786,7 @@ function setSite(st,info){const before=siteLock();S.site=st;S.siteInfo=info||{};
 function sitePos(p){const c=p.coords||p;const cab=S.cfg?.cabinet;if(!cab||cab.lat==null)return;const d=distM(cab,{lat:c.latitude,lng:c.longitude}),acc=c.accuracy||0,R=Number(cab.rayon)||10;
  const eff=d-Math.min(acc,SITE_TOL);const ins=S.site==='in'?eff<=R+15:eff<=R;setSite(ins?'in':'out',{d,acc})}
 let siteWatch=null;
-function startSite(){if(S.isOwner||!S.cfg?.cabinet||S.cfg.cabinet.lat==null)return;
+function startSite(){if(S._owner||!S.cfg?.cabinet||S.cfg.cabinet.lat==null)return;
  if(!S.site){const last=Number(ls.get('ns_site_in',0));S.site=Date.now()-last<120000?'in':'checking'}
  if(!navigator.geolocation){setSite('nogps',{msg:'Cet appareil ne permet pas de vérifier votre position (pas de GPS).'});return}
  const err=e=>setSite('nogps',{msg:geoErr(e)});
@@ -761,6 +794,7 @@ function startSite(){if(S.isOwner||!S.cfg?.cabinet||S.cfg.cabinet.lat==null)retu
  if(siteWatch==null)siteWatch=navigator.geolocation.watchPosition(sitePos,err,{enableHighAccuracy:true,maximumAge:20000,timeout:60000})}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&S.site){S.site=S.site==='in'?'in':'checking';startSite()}});
 function banners(){
+ if(S.demo)return demoBanner()+(siteLock()?siteBanner():'');
  if(siteLock()&&S.authUser&&!gated())return siteBanner();
  if(!S.ready)return `<div class="banner info">Connexion aux données du cabinet…</div>`;
  if(!S.db)return `<div class="banner">Connexion au serveur du cabinet impossible. Vérifiez la configuration (config.js) et la connexion Internet.</div>`;
@@ -1014,7 +1048,7 @@ async function searchPatients(){const L=$('#patList');if(!L)return;if(!S.db){L.i
   :`<div class="empty"><strong>${q?'Aucun patient trouvé':'Aucun dossier patient'}</strong>${perm('pat_edit')?'Créez la fiche avec le bouton « Patient ».':q?'Vérifiez l\'orthographe ou cherchez par téléphone.':''}</div>`}
 function openPatient(id){closePatient();S.histAll=false;S.rdvAll=false;S.patient=id;S.patDoc=null;S.patDocs=[];S.patRdv=[];S.patFilter='tout';
  if(S.db){S.subs.pat=S.db.doc('patients/'+id).onSnapshot(s=>{S.patDoc=s.exists?{id,...s.data()}:false;refresh('patients')},e=>console.warn(e));
-  S.subs.patDocs=S.db.collection(`patients/${id}/docs`).orderBy('ts','desc').limit(300).onSnapshot(s=>{S.patDocs=s.docs.map(d=>({id:d.id,...d.data()}));refresh('patients')},e=>console.warn(e));loadPatRdv();loadPatHist(id)}
+  if(perm('pat_voir')){S.subs.patDocs=S.db.collection(`patients/${id}/docs`).orderBy('ts','desc').limit(300).onSnapshot(s=>{S.patDocs=s.docs.map(d=>({id:d.id,...d.data()}));refresh('patients')},e=>console.warn(e));loadPatHist(id)}if(perm('rdv_voir'))loadPatRdv()}
  go('patients')}
 async function loadPatHist(id){S.patHist=null;S.patFin=null;S.patCaisse=null;
  try{if(perm('pat_voir')){const h=await S.db.doc('historique/'+id).get();if(S.patient!==id)return;S.patHist=h.exists?h.data():null}}catch(e){}
@@ -1086,6 +1120,7 @@ function updatePatient(){const p=S.patDoc;const H=$('#patHead'),B=$('#patBody');
  const dl=(k,v)=>v?`<dt>${k}</dt><dd>${esc(v)}</dd>`:'';const f=S.patFilter||'tout';const docs=S.patDocs.filter(d=>f==='tout'||d.type===f);
  const up=perm('pat_docs')&&!!S.assets;const rdvs=[...S.patRdv].sort((a,b)=>(b.date+b.heure).localeCompare(a.date+a.heure));
  const info=dl('Téléphone',p.tel)+dl('Naissance',p.naissance?fmtDate(p.naissance,{day:'numeric',month:'long',year:'numeric'}):'')+dl('CIN',p.cin)+dl('Adresse',p.adresse)+dl('Couverture',p.couv);
+ if(!perm('pat_voir')){B.innerHTML=`<section class="card"><dl class="dl">${dl('Téléphone',p.tel)+dl('Naissance',p.naissance?fmtDate(p.naissance,{day:'numeric',month:'long',year:'numeric'}):'')}</dl></section><div class="small muted">${ic('lock')} Le dossier médical, les radios et l'historique ne sont pas accessibles avec vos droits.</div>`;return}
  const med=dl('Antécédents',p.antecedents)+dl('Traitements',p.traitements)+dl('Allergies',p.allergies)+dl('Notes',p.notes);
  B.innerHTML=`${perm('pat_edit')||perm('rdv_gerer')||perm('labo_gerer')?`<div class="row">${perm('pat_edit')?`<button class="btn ghost" data-act="patEdit">${ic('edit')}Modifier la fiche</button>`:''}${perm('rdv_gerer')?`<button class="btn ghost" data-act="patRdv">${ic('cal')}Nouveau rendez-vous</button>`:''}${perm('labo_gerer')?`<button class="btn ghost" data-act="patLab">${ic('lab')}Travail de laboratoire</button>`:''}</div>`:''}
  ${p.allergies?`<div class="banner danger">${ic('alert')}<span>Allergies : ${esc(p.allergies)}</span></div>`:''}
@@ -1579,6 +1614,9 @@ async function loadRecettes(){const o=$('#reOut');if(!o)return;if(!S.db||!S.cfg.
 Views.pointage={
  mount(el){el.innerHTML=`<div class="stack"><div><div class="eyebrow">Présences</div><h1>Pointage</h1></div>${banners()}<div id="ptMine"></div>
  <div class="card"><h3 style="margin-bottom:6px">Mes 30 derniers jours</h3><div id="ptHist" class="small muted">Chargement…</div></div>
+ <div class="card stack" style="gap:8px"><div class="row"><h3>Horaires de travail</h3><span class="sp"></span>${S.isOwner?`<button class="btn ghost" data-act="horairesEdit">${ic('edit')}Modifier</button>`:''}</div>
+  <div class="list">${[1,2,3,4,5,6,0].map(k=>{const sl=(horaires().jours[k]||[]);return `<div class="li"><div class="grow"><div class="t">${JOURS[k]}</div></div><span class="${sl.length?'':'muted'} small">${esc(slotsTxt(sl))}</span></div>`}).join('')}</div>
+  <div class="small muted">Tolérance de retard : ${esc(horaires().tol??10)} min.</div></div>
  ${S.isOwner?`<div class="card stack" style="gap:10px"><h3>Position du cabinet</h3><div class="small muted">Hors de ce rayon (ou sans GPS), les membres n'ont accès qu'aux groupes de discussion : agenda, patients, stock, caisse, pointage… sont bloqués. Votre compte n'est jamais limité. La précision du GPS en intérieur est de 10 à 30 m : une marge de 30 m est ajoutée au rayon.</div>
   <div id="ptCab"></div></div>
   <div class="card stack" style="gap:10px"><div class="row"><h3>Équipe</h3><span class="sp"></span><input class="inp" type="date" id="ptDate" value="${S.ptDate||today()}" style="width:auto" aria-label="Jour"><button class="ib" data-act="ptLoad" aria-label="Actualiser">${ic('refresh')}</button></div><div id="ptTeam" class="small muted">Chargement…</div></div>`:''}</div>`;
@@ -1586,7 +1624,7 @@ Views.pointage={
  updCab(){const b=$('#ptCab');if(!b)return;const c=S.cfg.cabinet;b.innerHTML=`${c?.lat!=null?`<div class="banner info">${ic('check')}Position enregistrée (${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}), rayon ${esc(c.rayon||10)} m. <a href="https://maps.google.com/?q=${c.lat},${c.lng}" target="_blank" rel="noopener">Voir sur la carte</a></div>`:`<div class="banner warn">${ic('alert')}Position non définie : le pointage n'est pas encore limité au cabinet.</div>`}
   <div class="row" style="gap:8px;flex-wrap:wrap"><label class="f" style="width:140px">Rayon (mètres)<input class="inp" type="number" min="5" max="2000" step="5" id="ptRayon" value="${esc(c?.rayon||10)}"></label><span class="sp"></span><button class="btn pri" data-act="ptSetCab">${ic('refresh')}Enregistrer ma position actuelle comme cabinet</button>${c?.lat!=null?`<button class="btn ghost" data-act="ptRayon">Modifier le rayon</button>`:''}</div>`},
  update(){Views.pointage.updCab();const b=$('#ptMine');if(!b)return;const st=ptState(S.myPointage);
-  b.innerHTML=`<div class="clock"><div class="bigtime">${nowHM()}</div><div class="st">${st.sessions.length?st.sessions.map(s=>`${hm(s.in)} → ${s.out?hm(s.out):'en cours'}`).join(' · ')+` · total ${dur(st.total)}`:'Pas encore de pointage aujourd\'hui.'}</div>
+  b.innerHTML=`<div class="clock"><div class="small" style="opacity:.85;margin-bottom:4px">Horaires du jour : ${esc(slotsTxt(slotsOf(today())))}</div><div class="bigtime">${nowHM()}</div><div class="st">${ecartPills(today(),S.myPointage)}${st.sessions.length?st.sessions.map(s=>`${hm(s.in)} → ${s.out?hm(s.out):'en cours'}`).join(' · ')+` · total ${dur(st.total)}`:'Pas encore de pointage aujourd\'hui.'}</div>
   <button class="btn big" data-act="pointer">${ic('clock')}${st.inside?'Pointer le départ':'Pointer l\'arrivée'}</button>${S.cfg.cabinet?.lat!=null&&!S.isOwner?'<div class="small" style="opacity:.8;margin-top:8px">Pointage possible uniquement au cabinet (position vérifiée).</div>':''}</div>`}};
 async function ptSetCab(){if(!await ask('Enregistrer votre position actuelle comme position du cabinet ? Faites-le à l\'intérieur du cabinet.','Enregistrer'))return;
  toast('Localisation en cours…');let c;try{c=await getPos()}catch(e){toast(geoErr(e),'err');return}
@@ -1595,14 +1633,34 @@ async function ptSetCab(){if(!await ask('Enregistrer votre position actuelle com
  W(()=>S.db.doc('cfg/cabinet').set({lat:c.latitude,lng:c.longitude,rayon,precision:Math.round(c.accuracy),maj:Date.now()}),'Position du cabinet enregistrée')}
 async function loadMyHist(){const h=$('#ptHist');if(!h)return;if(!S.db||!S.uid){h.textContent='Indisponible.';return}
  try{const s=await S.db.collection(`pointage/${S.uid}/j`).orderBy('date','desc').limit(30).get();const rows=s.docs.map(d=>d.data());
-  h.innerHTML=rows.length?`<div class="tablewrap"><table><thead><tr><th>Jour</th><th>Arrivée</th><th>Départ</th><th class="r">Durée</th></tr></thead><tbody>${rows.map(r=>{const st=ptState(r);return `<tr><td>${esc(fmtDate(r.date,{weekday:'short',day:'numeric',month:'short'}))}</td><td class="num">${st.first?hm(st.first):'—'}</td><td class="num">${st.last?.out?hm(st.last.out):'—'}</td><td class="r num">${dur(st.total)}</td></tr>`}).join('')}</tbody></table></div>`:'Aucun pointage enregistré.'}catch(e){h.textContent='Chargement impossible.'}}
+  h.innerHTML=rows.length?`<div class="tablewrap"><table><thead><tr><th>Jour</th><th>Arrivée</th><th>Départ</th><th class="r">Durée</th></tr></thead><tbody>${rows.map(r=>{const st=ptState(r);return `<tr><td>${esc(fmtDate(r.date,{weekday:'short',day:'numeric',month:'short'}))}</td><td class="num">${st.first?hm(st.first):'—'}${ptEcarts(r.date,r).retard?`<div><span class="pill bad">+${ptEcarts(r.date,r).retard} min</span></div>`:''}</td><td class="num">${st.last?.out?hm(st.last.out):'—'}</td><td class="r num">${dur(st.total)}</td></tr>`}).join('')}</tbody></table></div>`:'Aucun pointage enregistré.'}catch(e){h.textContent='Chargement impossible.'}}
 async function loadTeam(){const t=$('#ptTeam');if(!t)return;const d=S.ptDate||today(),m=d.slice(0,7);t.textContent='Chargement…';
  const rows=[];for(const u of teamMembers()){let day=null,mh=0,nd=0;try{const s=await S.db.doc(`pointage/${u}/j/${d}`).get();if(s.exists)day=s.data();
   const ms=await S.db.collection(`pointage/${u}/j`).where('mois','==',m).get();ms.docs.forEach(x=>{mh+=ptState(x.data()).total;nd++})}catch(e){console.warn(e)}rows.push({u,day,mh,nd})}
  t.innerHTML=rows.length?`<div class="tablewrap"><table><thead><tr><th>Membre</th><th>Arrivée</th><th>Départ</th><th class="r">Durée</th><th class="r">${esc(fmtMonth(m))}</th></tr></thead><tbody>${rows.map(r=>{const st=ptState(r.day);
-  return `<tr><td><div style="font-weight:600;color:var(--fg)">${esc(nameOf(r.u))}</div><div class="small">${esc(ROLES[roleOf(r.u)]||'')}</div></td><td class="num">${st.first?hm(st.first):'<span class="pill">Absent</span>'}</td><td class="num">${st.inside?'<span class="pill ok">Présent</span>':st.last?.out?hm(st.last.out):'—'}</td><td class="r num">${st.sessions.length?dur(st.total):'—'}</td><td class="r num">${dur(r.mh)}<div class="small">${r.nd} j</div></td></tr>`}).join('')}</tbody></table></div>`:'Aucun membre inscrit pour le moment.'}
+  return `<tr><td><div style="font-weight:600;color:var(--fg)">${esc(nameOf(r.u))}</div><div class="small">${esc(ROLES[roleOf(r.u)]||'')}</div></td><td class="num">${st.first?hm(st.first)+(ptEcarts(d,r.day).retard?`<div><span class="pill bad">+${ptEcarts(d,r.day).retard} min</span></div>`:''):(slotsOf(d).length?'<span class="pill">Absent</span>':'<span class="small">Repos</span>')}</td><td class="num">${st.inside?'<span class="pill ok">Présent</span>':st.last?.out?hm(st.last.out)+(ptEcarts(d,r.day).avance?`<div><span class="pill warn">−${ptEcarts(d,r.day).avance} min</span></div>`:''):'—'}</td><td class="r num">${st.sessions.length?dur(st.total):'—'}<div class="small">prévu ${dur(prevuMs(d))}</div></td><td class="r num">${dur(r.mh)}<div class="small">${r.nd} j</div></td></tr>`}).join('')}</tbody></table></div>`:'Aucun membre inscrit pour le moment.'}
 
 /* ---- Règlement ---- */
+/* ---- Rapports de fin de journée (administrateur) ---- */
+Views.rapports={mount(el){el.innerHTML=`<div class="stack"><div class="head"><div><div class="eyebrow">Administration</div><h1>Rapports du jour</h1><div class="muted">Envoyé automatiquement chaque soir à 20 h 30.</div></div><span class="sp"></span>
+  <button class="btn ghost" data-act="rapNow">${ic('refresh')}Générer maintenant</button></div>${banners()}<div class="chips" id="rapDates"></div><div id="rapOut" class="stack"><div class="small muted">Chargement…</div></div></div>`;loadRapports()},update(){}};
+async function loadRapports(){if(!S.db)return;try{const s=await S.db.collection('rapports').orderBy('cree','desc').limit(30).get();S.rapList=s.docs.map(d=>({id:d.id,...d.data()}));}catch(e){S.rapList=[]}
+ if(!S.rapSel||!S.rapList.some(r=>r.id===S.rapSel))S.rapSel=S.rapList[0]?.id;drawRapport()}
+function drawRapport(){const D=$('#rapDates'),O=$('#rapOut');if(!O)return;const L=S.rapList||[];
+ D.innerHTML=L.map(r=>`<button class="chip" aria-pressed="${r.id===S.rapSel}" data-act="rapPick" data-d="${esc(r.id)}">${esc(capFirst(fmtDate(r.id,{weekday:'short',day:'numeric',month:'short'})))}</button>`).join('');
+ const R=L.find(r=>r.id===S.rapSel);if(!R){O.innerHTML='<div class="card"><div class="empty"><strong>Aucun rapport pour le moment</strong>Le premier rapport sera créé ce soir à 20 h 30, ou maintenant avec « Générer maintenant ».</div></div>';return}
+ const li=(a,b)=>`<div class="li"><div class="grow"><div class="t">${a}</div></div><span class="small">${b}</span></div>`;const MD=n=>MAD0(n);const r=R.rdv||{};const c=R.caisse||{};
+ O.innerHTML=`<div class="small muted">${esc(capFirst(fmtDate(R.id,{weekday:'long',day:'numeric',month:'long',year:'numeric'})))} · généré à ${hm(R.cree)}</div>
+ <div class="grid2"><section class="card"><h3>Rendez-vous</h3><div class="mini-kpis"><div class="kpi"><b>${r.total||0}</b><span class="small muted">prévus</span></div><div class="kpi"><b>${r.termines||0}</b><span class="small muted">terminés</span></div><div class="kpi"><b style="color:${r.absents?'var(--bad)':'inherit'}">${r.absents||0}</b><span class="small muted">absents</span></div><div class="kpi"><b>${r.annules||0}</b><span class="small muted">annulés</span></div></div>
+  ${r.nonClotures?`<div class="banner warn">${r.nonClotures} rendez-vous non clôturé(s) dans l'agenda.</div>`:''}<div class="list">${Object.entries(r.parType||{}).map(([k,v])=>li(esc(k),v)).join('')}</div></section>
+ <section class="card"><h3>Caisse <span class="pill acc">Visible par vous seul</span></h3><div class="mini-kpis"><div class="kpi"><b>${MD(c.total)}</b><span class="small muted">${c.n||0} encaissement(s)</span></div></div><div class="list">${Object.entries(c.parMode||{}).map(([k,v])=>li(esc(MODES[k]||k),MD(v))).join('')}</div>
+  ${(c.corrections||[]).length?`<div class="banner warn">Corrections : ${c.corrections.map(x=>`${esc(x.par)}${x.patient?' ('+esc(x.patient)+')':''} : ${x.avant!=null?MD(x.avant)+' → ':''}${MD(x.apres)}`).join(' · ')}</div>`:''}${c.illisibles?`<div class="small muted">${c.illisibles} saisie(s) illisible(s).</div>`:''}</section></div>
+ <section class="card"><h3>Pointage de l'équipe</h3><div class="tablewrap"><table><thead><tr><th>Membre</th><th>Arrivée</th><th>Départ</th><th class="r">Présence</th></tr></thead><tbody>${(R.pointage||[]).map(p=>`<tr><td>${esc(p.nom)}</td><td>${p.arrivee?esc(p.arrivee)+(p.retard?` <span class="pill bad">+${p.retard} min</span>`:''):p.repos?'<span class="small muted">Repos</span>':'<span class="pill bad">Absent</span>'}</td><td>${p.depart?esc(p.depart)+(p.avance?` <span class="pill warn">−${p.avance} min</span>`:''):p.sansDepart?'<span class="pill warn">non pointé</span>':'—'}</td><td class="r num">${p.minutes!=null?dur(p.minutes*60000):'—'}</td></tr>`).join('')}</tbody></table></div></section>
+ ${(r.soins||[]).length?`<section class="card"><h3>Soins réalisés (${r.soins.length})</h3><div class="list">${r.soins.map(x=>`<div class="li"><span class="timechip">${esc(x.h)}</span><div class="grow"><div class="t">${esc(x.patient)}</div><div class="s">${esc(x.soin)}${x.dents?' · dent '+esc(x.dents):''}${x.suite?' · suite : '+esc(x.suite):''}</div></div></div>`).join('')}</div></section>`:''}
+ <div class="grid2"><section class="card"><h3>Patients</h3><div class="small">${(R.nouveauxPatients||[]).length?`<b>${R.nouveauxPatients.length} nouveau(x)</b> : ${esc(R.nouveauxPatients.join(', '))}`:'Aucun nouveau patient.'}</div></section>
+ <section class="card"><h3>Stock</h3><div class="small">${R.stock?.mouvements||0} article(s) mouvementé(s) · ${R.stock?.peu||0} à 2 pièces ou moins</div>${(R.stock?.aCommander||[]).length?`<div class="small" style="margin-top:6px"><span class="pill bad">À commander</span> ${esc(R.stock.aCommander.join(', '))}</div>`:''}</section></div>
+ <div class="grid2"><section class="card"><h3>Laboratoire</h3><div class="small">${(R.labo?.modifies||[]).length?esc(R.labo.modifies.join(' · ')):'Aucun travail mis à jour.'}</div>${(R.labo?.aligneursDemain||[]).length?`<div class="small" style="margin-top:6px"><b>Aligneurs à remettre demain :</b> ${esc(R.labo.aligneursDemain.join(', '))}</div>`:''}</section>
+ <section class="card"><h3>Groupes et checklists</h3><div class="small">${R.messages?.total||0} message(s) : ${Object.entries(R.messages?.parGroupe||{}).map(([g,n])=>esc(groups().find(x=>x.id===g)?.nom||g)+' '+n).join(', ')||'—'}</div><div class="small" style="margin-top:6px">${(R.checklists||[]).map(x=>`${esc(x.nom)} (${esc(x.par)}) ${x.fini?'✓':'en cours'}`).join(' · ')||'Aucune checklist.'}</div></section></div>`}
 Views.reglement={update(el){const A=reglement();const v=S.cfg.reglement?.version||0;const a=S.annuaire[S.uid];const accepted=v&&a?.reglementLu===v;
  const readers=teamMembers().filter(u=>u!==S.uid&&v&&S.annuaire[u]?.reglementLu===v);
  el.innerHTML=`<div class="stack"><div class="head"><div><div class="eyebrow">Natural Smile Dental Office</div><h1>Règlement intérieur</h1></div><span class="sp"></span>${S.isOwner?`<button class="btn ghost" data-act="regEdit">${ic('edit')}Modifier</button>`:''}</div>
@@ -1640,7 +1698,7 @@ Views.equipe={mount(el){const a=S.annuaire[S.uid]||{};
   const pend=others.filter(u=>!memberOf(u)),act=others.filter(u=>statutOf(u)==='actif'),off=others.filter(u=>['retire','refuse'].includes(statutOf(u)));
   const P=$('#eqPending');if(P){P.hidden=!pend.length;P.innerHTML=`<div class="card-h"><h3>Demandes d'accès</h3><span class="sp"></span><span class="pill warn">${pend.length} en attente</span></div><div class="list">${pend.map(u=>`<div class="li wrap">${av(u)}<div class="grow"><div class="t">${esc(nameOf(u))}</div><div class="s">${esc(em(u)||'E-mail non renseigné')}</div><div class="s">${S.annuaire[u].roleSouhaite?esc(ROLES[S.annuaire[u].roleSouhaite]||'')+', ':''}demande du ${esc(new Date(S.annuaire[u].demandeLe||S.annuaire[u].premiere||Date.now()).toLocaleDateString('fr-FR',{day:'numeric',month:'long'}))}</div></div><div class="acts"><button class="btn ghost danger" data-act="memRefuse" data-u="${esc(u)}">Refuser</button><button class="btn pri" data-act="memPerms" data-u="${esc(u)}">Accepter</button></div></div>`).join('')}</div>`}
   const L=$('#eqList');if(L)L.innerHTML=act.length?act.sort((a,b)=>nameOf(a).localeCompare(nameOf(b),'fr')).map(u=>{const m=memberOf(u);const n=PERMS.filter(([k])=>{const v=m.perms?.[k];return v===undefined?DEF_ON.includes(k):v}).length;
-   return `<div class="li">${av(u)}<div class="grow"><div class="t">${esc(nameOf(u))}</div><div class="s">${esc(em(u))}</div><div class="s">${esc(ROLES[m.role]||'Rôle non attribué')}, ${n} accès et droits${v?(S.annuaire[u]?.reglementLu===v?', règlement accepté':', règlement non accepté'):''}</div></div><button class="btn ghost" data-act="memPerms" data-u="${esc(u)}">${ic('shield')}Droits</button></div>`}).join(''):'<div class="small muted">Aucun membre validé pour le moment.</div>';
+   return `<div class="li">${av(u)}<div class="grow"><div class="t">${esc(nameOf(u))}</div><div class="s">${esc(em(u))}</div><div class="s">${esc(ROLES[m.role]||'Rôle non attribué')}, ${n} accès et droits${v?(S.annuaire[u]?.reglementLu===v?', règlement accepté':', règlement non accepté'):''}</div></div><button class="btn ghost" data-act="demo" data-u="${esc(u)}" title="Voir l'application comme ce membre">${ic('users')}Démo</button><button class="btn ghost" data-act="memPerms" data-u="${esc(u)}">${ic('shield')}Droits</button></div>`}).join(''):'<div class="small muted">Aucun membre validé pour le moment.</div>';
   const O=$('#eqOff');if(O){O.hidden=!off.length;O.innerHTML=`<div class="card-h"><h3>Accès suspendus ou refusés</h3></div><div class="list">${off.map(u=>`<div class="li wrap">${av(u)}<div class="grow"><div class="t">${esc(nameOf(u))}</div><div class="s">${statutOf(u)==='retire'?'Accès suspendu':'Demande refusée'}</div></div><div class="acts"><button class="btn ghost danger" data-act="memDelete" data-u="${esc(u)}">Supprimer</button><button class="btn ghost" data-act="memPerms" data-u="${esc(u)}">Réactiver</button></div></div>`).join('')}</div>`}
   const G=$('#grpList');if(G)G.innerHTML=groups().map(g=>`<div class="li" style="cursor:pointer" data-act="grpEdit" data-id="${esc(g.id)}"><div class="gicon">${esc(g.nom[0]||'G')}</div><div class="grow"><div class="t">${esc(g.nom)}</div><div class="s">${esc(g.desc||'')}</div></div><span class="muted">${ic('edit')}</span></div>`).join('')}};
 function setMember(u,data,msg){if(!S.isOwner)return Promise.resolve(false);return W(()=>S.db.doc('membres/'+u).set(data),msg)}
@@ -1725,7 +1783,7 @@ async function purge(k){const conf={messages:['ts',180,'les messages de plus de 
   toast(n?`${n} élément${n>1?'s':''} supprimé${n>1?'s':''}`+(n===300?' (relancez pour continuer)':''):'Rien à supprimer')}catch(e){console.warn(e);toast(errMsg(e),'err')}}
 
 /* ---------- actions ---------- */
-const Acts={siteRetry:()=>{setSite('checking');if(siteWatch!=null){navigator.geolocation.clearWatch(siteWatch);siteWatch=null}startSite()},
+const Acts={rapPick:a=>{S.rapSel=a.dataset.d;drawRapport()},rapNow:async a=>{if(!await W(()=>S.db.doc('cfg/rapportDemande').set({date:today(),ts:Date.now()})))return;a.disabled=true;a.textContent='Génération en cours…';S.rapSel=today();setTimeout(loadRapports,9000);setTimeout(()=>{loadRapports();a.disabled=false;a.textContent='Générer maintenant'},25000)},horairesEdit,demo:a=>demoStart(a.dataset.u),demoExit,demoSite:()=>{S.demoSite=S.demoSite==='out'?'in':'out';restartData();renderNav();if(!allowedView(S.view))go('accueil');else go(S.view)},siteRetry:()=>{setSite('checking');if(siteWatch!=null){navigator.geolocation.clearWatch(siteWatch);siteWatch=null}startSite()},
  more:openMore,pointer,
  startTpl:a=>{if(perm('mod_checklists'))startTpl(a.dataset.id)},
  resumeRun:a=>{S.run=a.dataset.id;S.runLocal=null;go('checklists')},
