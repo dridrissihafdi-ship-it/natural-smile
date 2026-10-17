@@ -201,6 +201,10 @@ td.r,th.r{text-align:right}
 .rdv{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;transition:background .2s}.rdv.pressing{background:var(--accent-soft);border-radius:12px}
 .alprog{display:flex;flex-direction:column;gap:6px;margin:8px 0 2px}.alprog .bar{height:6px;border-radius:9px;background:var(--line);overflow:hidden}.alprog .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--gold-1),var(--gold-2))}
 .hrow{display:flex;flex-direction:column;gap:4px}.hrow input[type=time]{width:auto;min-width:96px;padding:8px}
+.cthumbs{display:flex;gap:6px;flex-wrap:wrap}.cthumb{position:relative;display:inline-block}.cthumb img{width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.cthumb .pdfchip{display:grid;place-items:center;width:64px;height:64px;border-radius:10px;background:var(--accent-soft);font-weight:700;color:var(--gold-2);text-decoration:none}
+.cthumb .x{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:0;background:var(--bad);color:#fff;font-weight:700;cursor:pointer;line-height:1}
+.paycard{border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
 .demo-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:2px solid var(--gold-2)}.demo-bar>svg{width:22px;height:22px}
 .site-lock{display:flex;gap:10px;align-items:center}.site-lock>svg{width:22px;height:22px;flex:none}
 .menu-list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;overflow:hidden}
@@ -413,7 +417,7 @@ const I={
  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
  chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',book:'<path d="M4 4h6a2 2 0 012 2v14a2 2 0 00-2-2H4z"/><path d="M20 4h-6a2 2 0 00-2 2v14a2 2 0 012-2h6z"/>',
  users:'<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><path d="M16 4.5a3.5 3.5 0 010 7M22 20c0-3-2-5-5-5.7"/>',
- plus:'<path d="M12 5v14M5 12h14"/>',scan:'<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8v8M10 8v8M14 8v8M17 8v8"/>',minus:'<path d="M5 12h14"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',phone:'<path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1.9.4 1.8.7 2.7a2 2 0 01-.5 2.1L8 9.8a16 16 0 006 6l1.3-1.3a2 2 0 012.1-.4c.9.3 1.8.6 2.7.7a2 2 0 011.7 2z"/>',mail:'<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6l-10 7L2 6"/>',scan:'<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8v8M10 8v8M14 8v8M17 8v8"/>',minus:'<path d="M5 12h14"/>',
  x:'<path d="M6 6l12 12M18 6L6 18"/>',
  left:'<path d="M15 5l-7 7 7 7"/>',right:'<path d="M9 5l7 7-7 7"/>',
  send:'<path d="M4 12l16-8-6 16-3-6z"/>',
@@ -555,8 +559,8 @@ const lastSeen=ls.get('ns_seen',{});
 const groups=()=>(S.cfg.groupes?.liste?.length?S.cfg.groupes.liste:DEF_GROUPS);
 const templates=()=>(S.cfg.checklists?.liste?.length?S.cfg.checklists.liste:DEF_CL);
 const reglement=()=>(S.cfg.reglement?.articles?.length?S.cfg.reglement.articles:DEF_REGLEMENT);
-const MODULES=[['pat_liste','Liste des patients (noms et téléphones, sans dossier médical)'],['rdv_voir','Agenda complet'],['rdv_jour','Rendez-vous du jour uniquement (photos, radios, soins, notes)'],['pat_voir','Dossiers patients'],['labo_voir','Laboratoire'],['mod_groupes','Groupes de discussion'],['mod_checklists','Checklists'],['mod_stock','Stock du cabinet'],['caisse','Caisse (saisie des encaissements, sans voir les totaux)'],['mod_pointage','Pointage'],['mod_reglement','Règlement intérieur']];
-const ACTIONS=[['rdv_gerer','Ajouter et modifier des rendez-vous'],['rdv_suppr','Supprimer des rendez-vous'],['pat_edit','Créer et modifier les fiches patients'],['pat_docs','Ajouter des radios et des photos'],['pat_suppr','Supprimer des patients et des fichiers'],['stock_edit','Modifier le stock du cabinet'],['labo_gerer','Créer et suivre les travaux du laboratoire, gérer son stock'],['caisse_edit','Corriger ses encaissements du jour (sans voir les totaux)']];
+const MODULES=[['pat_liste','Liste des patients (noms et téléphones, sans dossier médical)'],['rdv_voir','Agenda complet'],['rdv_jour','Rendez-vous du jour uniquement (photos, radios, soins, notes)'],['pat_voir','Dossiers patients'],['labo_voir','Laboratoire'],['mod_groupes','Groupes de discussion'],['mod_checklists','Checklists'],['mod_stock','Stock du cabinet'],['caisse','Caisse (saisie des encaissements, sans voir les totaux)'],['compta_voir','Comptabilité : factures, assurances et fournisseurs (avec les montants)'],['mod_pointage','Pointage'],['mod_reglement','Règlement intérieur']];
+const ACTIONS=[['rdv_gerer','Ajouter et modifier des rendez-vous'],['rdv_suppr','Supprimer des rendez-vous'],['pat_edit','Créer et modifier les fiches patients'],['pat_docs','Ajouter des radios et des photos'],['pat_suppr','Supprimer des patients et des fichiers'],['stock_edit','Modifier le stock du cabinet'],['labo_gerer','Créer et suivre les travaux du laboratoire, gérer son stock'],['caisse_edit','Corriger ses encaissements du jour (sans voir les totaux)'],['compta_edit','Comptabilité : ajouter et modifier factures, paiements, assurances et fournisseurs']];
 const PERMS=[...MODULES,...ACTIONS];
 const DEF_ON=['mod_groupes','mod_checklists','mod_stock','mod_pointage','mod_reglement'];
 const PRESETS={dentiste:['rdv_voir','rdv_gerer','rdv_suppr','pat_voir','pat_edit','pat_docs','stock_edit','labo_voir','labo_gerer'],assistante:['rdv_jour','stock_edit'],
@@ -643,7 +647,8 @@ const NAV=[
  {id:'caisse',lbl:'Caisse',ic:'cash',show:canCaisse,short:'Caisse'},
  {id:'pointage',lbl:'Pointage',ic:'clock',short:'Pointage',show:()=>perm('mod_pointage')},
  {id:'reglement',lbl:'Règlement intérieur',ic:'book',short:'Règlement',show:()=>perm('mod_reglement')},
- {id:'rapports',lbl:'Rapports du jour',ic:'chart',short:'Rapports',show:()=>S.isOwner},
+ {id:'compta',lbl:'Comptabilité',ic:'cash',short:'Compta',show:()=>perm('compta_voir')},
+ {id:'rapports',lbl:'Rapports',ic:'chart',short:'Rapports',show:()=>S.isOwner},
  {id:'equipe',lbl:()=>S.isOwner?'Équipe & accès':'Mon profil',ic:()=>S.isOwner?'shield':'users',short:()=>S.isOwner?'Accès':'Profil'}
 ];
 const lbl=n=>typeof n.lbl==='function'?n.lbl():n.lbl;
@@ -1350,7 +1355,7 @@ function stockMount(el,embedded){const lab=S.stockZone==='labo';
   <div class="chips" id="stChips"></div><div class="card" style="padding-block:4px" id="stList"></div></div>${canStock()?`<button class="btn pri big fab" data-act="stockEdit" data-id="">${ic('plus')}Article</button>`:''}`;
  $('#stq').addEventListener('input',e=>{S.stockQ=e.target.value;stockUpdate()})}
 function stockRow(i,can){const qte=qtyOf(i);const lo=isLow(i);return `<div class="stk ${lo||qte<=2?'low':''}"><div class="grow" data-act="stockEdit" data-id="${esc(i.id)}"><div style="font-weight:600">${esc(i.nom)} ${lo?'<span class="pill bad">À commander</span>':''}${perPill(i)}</div>
-   <div class="small muted">${esc([S.stockFilter===stockCat(i)?'':stockCat(i),i.lieu,i.fournisseur].filter(Boolean).join(', '))}${Number(i.seuil)?`, seuil ${esc(i.seuil)}`:''}</div></div>
+   <div class="small muted">${esc([S.stockFilter===stockCat(i)?'':stockCat(i),i.lieu,...(i.fourIds||[]).map(fourName),i.fournisseur].filter(Boolean).join(', '))}${Number(i.seuil)?`, seuil ${esc(i.seuil)}`:''}</div></div>
    <div class="qty">${can?`<button class="ib" data-act="qty" data-id="${esc(i.id)}" data-n="-1" aria-label="Retirer une unité">${ic('minus')}</button>`:''}<b>${qte}</b>${can?`<button class="ib" data-act="qty" data-id="${esc(i.id)}" data-n="1" aria-label="Ajouter une unité">${ic('plus')}</button>`:''}<span class="small muted" style="min-width:3ch">${esc(i.unite||'')}</span></div></div>`}
 const isPeu=i=>qtyOf(i)<=2;
 const perPill=i=>{if(!i.peremption||qtyOf(i)<=0)return '';const t=today();const soon=new Date(Date.now()+60*864e5).toISOString().slice(0,10);return i.peremption<t?' <span class="pill bad">Périmé</span>':i.peremption<=soon?` <span class="pill warn">Pér. ${esc(fmtDate(i.peremption,{day:'numeric',month:'short'}))}</span>`:''};
@@ -1392,12 +1397,13 @@ function stockEdit(id){const lab=S.stockZone==='labo';const CATS0=lab?LAB_CATS:S
  <div class="fgrid"><label class="f">Quantité<input class="inp" type="number" name="qte" id="st-qte" min="0" step="1" value="${esc(qtyOf(i)??0)}"></label>
  <label class="f">Seuil d'alerte<input class="inp" type="number" name="seuil" id="st-seuil" min="0" step="1" value="${esc(i.seuil||0)}"></label></div>
  <div class="fgrid"><label class="f">Emplacement<input class="inp" name="lieu" id="st-lieu" placeholder="${lab?'Armoire CFAO, étagère 2…':'Tiroir 3, réserve…'}" value="${esc(i.lieu)}"></label>
- <label class="f">Fournisseur<input class="inp" name="fournisseur" id="st-four" value="${esc(i.fournisseur)}"></label></div>
+ <label class="f">Autre fournisseur (texte)<input class="inp" name="fournisseur" id="st-four" value="${esc(i.fournisseur)}"></label></div>
+ <div class="stack" style="gap:6px"><b class="small">Sociétés qui fournissent cet article</b>${fourList().filter(x=>x.type!=='autre').length?`<div class="chips">${fourList().filter(x=>x.type!=='autre').map(x=>`<label class="chip" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" name="fo_${esc(x.id)}" ${(i.fourIds||[]).includes(x.id)?'checked':''}>${esc(x.nom)}</label>`).join('')}</div>`:'<div class="small muted">Aucune société enregistrée : ajoutez-les dans Comptabilité › Fournisseurs.</div>'}</div>
  <label class="f">Codes-barres associés<input class="inp" name="codes" id="st-codes" value="${esc((i.codes||[]).join(', '))}" placeholder="Scannez avec « Scanner une entrée » ou saisissez le code" autocomplete="off"></label>
  ${i.peremption?`<div class="small muted">Péremption du lot le plus proche : ${esc(fmtDate(i.peremption,{day:'numeric',month:'long',year:'numeric'}))}</div>`:''}
  ${i.maj?`<div class="small muted">Dernière mise à jour : ${esc(nameOf(i.par))}, ${new Date(i.maj).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})}</div>`:''}`,
  onOk:async f=>{if(!f.nom.trim()){toast('Indiquez la désignation.','err');return false}
-  const data={nom:f.nom.trim(),cat:f.cat,unite:f.unite.trim(),qte:Math.max(0,Number(f.qte)||0),seuil:Math.max(0,Number(f.seuil)||0),lieu:f.lieu.trim(),fournisseur:f.fournisseur.trim(),codes:[...new Set(String(f.codes||'').split(/[,;\s]+/).filter(Boolean).map(x=>parseCode(x).key))],maj:Date.now(),par:S.uid};
+  const data={nom:f.nom.trim(),cat:f.cat,unite:f.unite.trim(),qte:Math.max(0,Number(f.qte)||0),seuil:Math.max(0,Number(f.seuil)||0),lieu:f.lieu.trim(),fournisseur:f.fournisseur.trim(),fourIds:fourList().filter(x=>f['fo_'+x.id]).map(x=>x.id),codes:[...new Set(String(f.codes||'').split(/[,;\s]+/).filter(Boolean).map(x=>parseCode(x).key))],maj:Date.now(),par:S.uid};
   delete S.stockLocal[i.id];return i.id?W(()=>S.db.doc('stock/'+i.id).update(data),'Article mis à jour'):W(()=>S.db.collection('stock').add({...data,zone:S.stockZone||'cabinet'}),'Article ajouté')},
  onDel:async()=>{if(!await ask('Supprimer « '+i.nom+' » du stock ?','Supprimer'))return false;return W(()=>S.db.doc('stock/'+i.id).delete(),'Article supprimé')}});
  {const sel=$('#st-cat'),nm=$('#st-nom'),un=$('#st-unite');const fill=()=>{$('#dl-stcat').innerHTML=catItems(sel.value).map(x=>`<option value="${esc(x.nom)}">`).join('')};fill();sel.onchange=fill;
@@ -1405,10 +1411,12 @@ function stockEdit(id){const lab=S.stockZone==='labo';const CATS0=lab?LAB_CATS:S
 function changeQty(id,n){const it=S.stock.find(x=>x.id===id);if(!it)return;const v=Math.max(0,qtyOf(it)+n);S.stockLocal[id]=v;stockUpdate();
  later('qty-'+id,async()=>{const val=S.stockLocal[id];await W(()=>S.db.doc('stock/'+id).update({qte:val,maj:Date.now(),par:S.uid}));if(S.stockLocal[id]===val)delete S.stockLocal[id]},900)}
 function orderList(){const lab=S.stockZone==='labo';const low=zoneItems().filter(isLow).sort((a,b)=>(a.fournisseur||'').localeCompare(b.fournisseur||''));
+ const byF={};low.forEach(i=>(i.fourIds?.length?i.fourIds:['']).forEach(f=>(byF[f]=byF[f]||[]).push(i)));
+ const waBtns=Object.entries(byF).filter(([f])=>f&&S.four?.[f]&&(S.four[f].wa||S.four[f].tel)).map(([f,L])=>{const x=S.four[f];const t=`Bonjour ${x.contact||''},\nCommande Natural Smile${lab?' (laboratoire)':''} :\n`+L.map(i=>`• ${i.nom}${i.unite?' ('+i.unite+')':''}`).join('\n')+'\nMerci.';return `<a class="btn ghost" href="${esc(waLink(x.wa||x.tel,t))}" target="_blank" rel="noopener">${ic('chat')}Commander chez ${esc(x.nom)} (${L.length})</a>`}).join('');
  const txt=low.length?`Liste de commande ${lab?'du laboratoire':'du cabinet'} (`+fmtDate(today(),{day:'numeric',month:'long'})+') :\n'+low.map(i=>`• ${i.nom} : reste ${qtyOf(i)} ${i.unite||''} (seuil ${i.seuil})${i.fournisseur?', '+i.fournisseur:''}`).join('\n'):'';
  const g=groups().find(x=>x.id===(lab?'prothese':'consommables'))||groups().find(x=>x.id==='consommables')||groups()[0];
  openModal({title:'Liste de commande',ok:low.length?'Envoyer au groupe '+g.nom:null,cancel:'Fermer',
- body:low.length?`<textarea class="inp" name="txt" id="ord-txt" rows="10" style="min-height:220px">${esc(txt)}</textarea>`:`<div class="empty"><strong>Rien à commander</strong>Aucun article n'est sous son seuil d'alerte.</div>`,
+ body:low.length?`<textarea class="inp" name="txt" id="ord-txt" rows="10" style="min-height:220px">${esc(txt)}</textarea>${waBtns?`<div class="small muted">Envoyer directement la commande par WhatsApp :</div><div class="stack" style="gap:6px">${waBtns}</div>`:''}`:`<div class="empty"><strong>Rien à commander</strong>Aucun article n'est sous son seuil d'alerte.</div>`,
  onOk:async f=>{const prev=S.grp;S.grp=g.id;const ok=await postMsg({type:'text',texte:f.txt});S.grp=prev;if(ok)toast('Liste envoyée dans « '+g.nom+' »');return ok}})}
 
 /* ---- Laboratoire ---- */
@@ -1492,13 +1500,13 @@ async function alRemis(id){const c=S.labo.find(x=>x.id===id);if(!c)return;const 
 function labModal(c){const tab=c?.section||S.labTab||'fixe';const sec=LAB[tab];const ro=!perm('labo_gerer');S.patPick={};
  c=c||{section:tab,statut:sec.steps[0][0],echeance:'',envoiLe:tab==='externe'?today():''};
  const praticiens=teamMembers().filter(u=>['dentiste','stagiaire','prothesiste'].includes(roleOf(u))).map(nameOf);
- const labs=[...new Set(S.labo.map(x=>x.laboExt).filter(Boolean))];
+ const labs=[...new Set([...fourList().filter(x=>x.type==='labo').map(x=>x.nom),...S.labo.map(x=>x.laboExt).filter(Boolean)])];
  const d=openModal({title:(c.id?(ro?'':'Modifier : '):'Nouveau : ')+sec.nom,ok:ro?null:'Enregistrer',cancel:ro?'Fermer':'Annuler',del:c.id&&!ro?'Supprimer':null,
  body:`<fieldset class="fs" ${ro?'disabled':''}><label class="f">Patient<input class="inp" name="patient" id="lb-pat" value="${esc(c.patient||'')}" autocomplete="off" required></label>
   <div class="fgrid"><label class="f">Travail<input class="inp" name="travail" id="lb-trav" list="dl-trav" value="${esc(c.travail||'')}" required></label><label class="f">${tab==='aligneurs'?'Arcade(s)':'Dent(s)'}<input class="inp" name="dents" id="lb-dents" value="${esc(c.dents||'')}" placeholder="${tab==='aligneurs'?'Maxillaire et mandibule':'14, 15, 16'}"></label></div>
   <div class="fgrid">${tab!=='aligneurs'?`<label class="f">Teinte<input class="inp" name="teinte" id="lb-teinte" list="dl-teinte" value="${esc(c.teinte||'')}"></label>`:`<label class="f">Nombre total d'aligneurs prévus<input class="inp" type="number" min="0" name="nb" id="lb-nb" value="${esc(c.nb||'')}"></label>`}
    <label class="f">Matériau<input class="inp" name="materiau" id="lb-mat" list="dl-mat" value="${esc(c.materiau||'')}"></label></div>
-  ${tab==='externe'?`<div class="fgrid"><label class="f">Laboratoire<input class="inp" name="laboExt" id="lb-labo" list="dl-labs" value="${esc(c.laboExt||'')}" required></label><label class="f">Date d'envoi<input class="inp" type="date" name="envoiLe" id="lb-envoi" value="${esc(c.envoiLe||'')}"></label></div>`:''}
+  ${tab==='externe'?`<div class="fgrid"><label class="f">Laboratoire<input class="inp" name="laboExt" id="lb-labo" list="dl-labs" value="${esc(c.laboExt||'')}" required></label><label class="f">Date d'envoi<input class="inp" type="date" name="envoiLe" id="lb-envoi" value="${esc(c.envoiLe||'')}"></label>${perm('compta_voir')?`<label class="f">Prix du laboratoire (DH)<input class="inp num" type="number" step="0.01" min="0" name="prix" id="lb-prix" value="${esc(c.prix??'')}"></label>`:''}</div>`:''}
   <div class="fgrid"><label class="f">Praticien<input class="inp" name="praticien" id="lb-prat" list="dl-lprat" value="${esc(c.praticien||'')}"></label><label class="f">${sec.echeance}<input class="inp" type="date" name="echeance" id="lb-ech" value="${esc(c.echeance||'')}"></label></div>
   ${tab==='aligneurs'?`<section class="card stack" style="gap:10px;padding:14px"><b>Suivi du traitement</b>
    <div class="fgrid"><label class="f">Dernier aligneur remis (n°)<input class="inp" type="number" min="0" name="alActuel" id="lb-alact" value="${esc(c.alActuel||0)}"></label><label class="f">Changement tous les (jours)<input class="inp" type="number" min="1" max="60" name="alIntervalle" id="lb-aliv" value="${esc(c.alIntervalle||14)}"></label></div>
@@ -1516,6 +1524,7 @@ function labModal(c){const tab=c?.section||S.labTab||'fixe';const sec=LAB[tab];c
   const pick=S.patPick[f.patient];let patient=f.patient.trim(),patientId=c.patientId||null;if(pick){patient=pick.nom;patientId=pick.id}else if(patient!==(c.patient||''))patientId=null;
   const data={section:tab,patient,patientId,travail:f.travail.trim(),dents:f.dents.trim(),teinte:(f.teinte||'').trim(),nb:f.nb?Number(f.nb):null,materiau:f.materiau.trim(),laboExt:(f.laboExt||'').trim(),envoiLe:f.envoiLe||'',
    praticien:f.praticien.trim(),echeance:f.echeance,statut:f.statut,notes:f.notes.trim(),maj:Date.now(),par:S.uid};
+  if(tab==='externe'&&'prix' in f)data.prix=f.prix===''?null:Number(f.prix);
   if(tab==='aligneurs'){data.alActuel=Math.max(0,Number(f.alActuel)||0);data.alIntervalle=Math.max(1,Number(f.alIntervalle)||14);data.alProchain=f.alProchain||''}
   if(c.id){if(f.statut!==c.statut)data.historique=[...(c.historique||[]),{s:f.statut,ts:Date.now(),by:S.uid}].slice(-40);return W(()=>S.db.doc('labo/'+c.id).update(data),'Travail enregistré')}
   return W(()=>S.db.collection('labo').add({...data,photos:[],historique:[{s:f.statut,ts:Date.now(),by:S.uid}],cree:Date.now(),creePar:S.uid}),'Travail ajouté')},
@@ -1641,16 +1650,163 @@ async function loadTeam(){const t=$('#ptTeam');if(!t)return;const d=S.ptDate||to
   return `<tr><td><div style="font-weight:600;color:var(--fg)">${esc(nameOf(r.u))}</div><div class="small">${esc(ROLES[roleOf(r.u)]||'')}</div></td><td class="num">${st.first?hm(st.first)+(ptEcarts(d,r.day).retard?`<div><span class="pill bad">+${ptEcarts(d,r.day).retard} min</span></div>`:''):(slotsOf(d).length?'<span class="pill">Absent</span>':'<span class="small">Repos</span>')}</td><td class="num">${st.inside?'<span class="pill ok">Présent</span>':st.last?.out?hm(st.last.out)+(ptEcarts(d,r.day).avance?`<div><span class="pill warn">−${ptEcarts(d,r.day).avance} min</span></div>`:''):'—'}</td><td class="r num">${st.sessions.length?dur(st.total):'—'}<div class="small">prévu ${dur(prevuMs(d))}</div></td><td class="r num">${dur(r.mh)}<div class="small">${r.nd} j</div></td></tr>`}).join('')}</tbody></table></div>`:'Aucun membre inscrit pour le moment.'}
 
 /* ---- Règlement ---- */
+/* ---- Comptabilité : factures fournisseurs, assurances des patients, fournisseurs et laboratoires ---- */
+const FOUR_TYPES={labo:'Laboratoire',materiel:'Matériel et consommables',autre:'Autre (charges, services…)'};
+const FACT_CATS=['Consommables','Matériel','Laboratoire (sous-traitance)','Implants et biomatériaux','Orthodontie et aligneurs','Loyer','Électricité et eau','Téléphone et Internet','Entretien et réparations','Logiciels et abonnements','Salaires et charges sociales','Impôts et taxes','Autre'];
+const PAY_MODES={especes:'Espèces',cheque:'Chèque',virement:'Virement',carte:'Carte bancaire',effet:'Effet / traite'};
+const ASSUREURS=['CNOPS','CNSS (AMO)','AXA Assurance','Sanlam (ex-Saham)','Wafa Assurance','RMA','AtlantaSanad','MAMDA / MCMA','Allianz','Mutuelle FAR','Mutuelle de l\'enseignement (MGPAP)','Autre'];
+const ASS_STATUTS={rempli:'Feuille remplie',remis:'Remise au patient',rembourse:'Remboursée'};
+const fourList=()=>Object.values(S.four||{}).sort((a,b)=>(a.nom||'').localeCompare(b.nom||'','fr'));
+const fourName=id=>S.four?.[id]?.nom||'';
+const factPaye=f=>(f.paiements||[]).reduce((t,p)=>t+(Number(p.montant)||0),0);
+const factReste=f=>Math.max(0,(Number(f.montant)||0)-factPaye(f));
+const telLink=t=>String(t||'').replace(/[^\d+]/g,'');
+const waLink=(t,txt)=>{let d=String(t||'').replace(/\D/g,'');if(d.startsWith('0'))d='212'+d.slice(1);return d?`https://wa.me/${d}${txt?'?text='+encodeURIComponent(txt):''}`:''};
+function pickFiles(accept,multiple){return new Promise(res=>{const i=document.createElement('input');i.type='file';i.accept=accept||'image/*,application/pdf';i.multiple=!!multiple;i.hidden=true;
+ i.onchange=()=>{res([...i.files]);i.remove()};document.body.appendChild(i);i.click()})}
+async function uploadFiles(files){const out=[];let n=0;for(const f of files){n++;toast(`Envoi ${n} sur ${files.length}…`);
+ try{if(f.type==='application/pdf'){const up=await S.assets.upload(f,{type:'application/pdf'});out.push({url:up.id,pdf:true})}else{const b=await compressImg(f,2200,.86);const up=await S.assets.upload(b,{type:'image/jpeg'});out.push({url:up.id})}}catch(e){console.warn(e);toast(errMsg(e),'err')}}return out}
+const thumbsHTML=(L,k)=>(L||[]).map((x,i)=>`<span class="cthumb">${x.pdf?`<a href="${esc(x.url)}" target="_blank" rel="noopener" class="pdfchip">PDF</a>`:`<a href="${esc(x.url)}" target="_blank" rel="noopener"><img src="${esc(x.url)}" alt=""></a>`}${k?`<button type="button" class="x" data-rm="${k}" data-i="${i}" aria-label="Retirer">×</button>`:''}</span>`).join('');
+
+Views.compta={
+ mount(el){const t=S.cTab||'factures';const can=perm('compta_edit');
+  el.innerHTML=`<div class="stack"><div class="head"><div><div class="eyebrow">Comptabilité</div><h1>${{factures:'Factures et paiements',assurances:'Assurances des patients',fournisseurs:'Fournisseurs et laboratoires'}[t]}</h1></div></div>${banners()}
+  <div class="segtabs" role="tablist">${[['factures','cash','Factures'],['assurances','shield','Assurances'],['fournisseurs','truck','Fournisseurs']].map(([k,i,l])=>`<button role="tab" class="segtab" aria-selected="${t===k}" data-act="cTab" data-t="${k}">${ic(i)}<span>${l}</span></button>`).join('')}</div>
+  <div id="cBody" class="stack"></div></div>
+  ${can?`<button class="btn pri big fab" data-act="${t==='factures'?'factEdit':t==='assurances'?'assEdit':'fourEdit'}" data-id="">${ic('plus')}${t==='factures'?'Facture':t==='assurances'?'Assurance':'Fournisseur'}</button>`:''}`;
+  this.update()},
+ update(){const B=$('#cBody');if(!B)return;const t=S.cTab||'factures';if(t==='factures')factView(B);else if(t==='assurances')assView(B);else fourView(B)}};
+
+/* Factures */
+function factView(B){const F=S.cF||{from:today().slice(0,7)+'-01',to:today(),four:'',st:'tout'};S.cF=F;
+ const L=(S.factures||[]).filter(f=>(!F.from||f.date>=F.from)&&(!F.to||f.date<=F.to)&&(!F.four||f.four===F.four)&&(F.st==='tout'||(F.st==='impaye'?factReste(f)>0:factReste(f)<=0)));
+ const tot=L.reduce((t,f)=>t+(Number(f.montant)||0),0),pay=L.reduce((t,f)=>t+factPaye(f),0);
+ B.innerHTML=`<section class="card stack" style="gap:10px"><div class="fgrid"><label class="f">Du<input class="inp" type="date" id="cf-from" value="${esc(F.from)}"></label><label class="f">Au<input class="inp" type="date" id="cf-to" value="${esc(F.to)}"></label></div>
+  <div class="fgrid"><label class="f">Fournisseur<select class="inp" id="cf-four"><option value="">Tous</option>${fourList().map(x=>`<option value="${esc(x.id)}" ${F.four===x.id?'selected':''}>${esc(x.nom)}</option>`).join('')}</select></label>
+  <label class="f">Statut<select class="inp" id="cf-st">${[['tout','Toutes'],['impaye','Non soldées'],['paye','Soldées']].map(([k,l])=>`<option value="${k}" ${F.st===k?'selected':''}>${l}</option>`).join('')}</select></label></div></section>
+ <div class="mini-kpis card"><div class="kpi"><b>${MAD0(tot)}</b><span class="small muted">${L.length} facture(s)</span></div><div class="kpi"><b>${MAD0(pay)}</b><span class="small muted">payé</span></div><div class="kpi"><b style="color:${tot-pay>0.5?'var(--bad)':'var(--ok)'}">${MAD0(tot-pay)}</b><span class="small muted">reste à payer</span></div></div>
+ <section class="card" style="padding-block:4px">${L.length?L.map(f=>{const r=factReste(f);return `<div class="li" style="cursor:pointer" data-act="factEdit" data-id="${esc(f.id)}"><div class="grow"><div class="t">${esc(fourName(f.four)||f.fourNom||'Fournisseur')}${f.num?` <span class="small muted">n° ${esc(f.num)}</span>`:''}</div>
+  <div class="s">${esc(fmtDate(f.date,{day:'numeric',month:'short',year:'numeric'}))} · ${esc(f.cat||'')}${(f.photos||[]).length?' · '+f.photos.length+' photo(s)':''}${(f.paiements||[]).length?' · '+f.paiements.length+' paiement(s)':''}</div></div>
+  <div style="text-align:right"><b class="num">${MAD0(f.montant)}</b><div>${r>0.5?`<span class="pill bad">reste ${MAD0(r)}</span>`:'<span class="pill ok">soldée</span>'}</div></div></div>`}).join(''):'<div class="empty"><strong>Aucune facture sur cette période</strong>Ajoutez une facture avec le bouton « Facture » : photo de la facture, fournisseur, montant et paiements.</div>'}</section>`;
+ const up=()=>{S.cF={from:$('#cf-from').value,to:$('#cf-to').value,four:$('#cf-four').value,st:$('#cf-st').value};factView(B)};['#cf-from','#cf-to','#cf-four','#cf-st'].forEach(k=>$(k).onchange=up)}
+function factEdit(id){const f0=(S.factures||[]).find(x=>x.id===id)||{date:today(),montant:'',cat:'Consommables',photos:[],paiements:[]};const f=JSON.parse(JSON.stringify(f0));const ro=!perm('compta_edit');
+ f.photos=f.photos||[];f.paiements=f.paiements||[];
+ const d=openModal({title:f.id?'Facture':'Nouvelle facture',ok:ro?null:'Enregistrer',cancel:ro?'Fermer':'Annuler',del:f.id&&!ro?'Supprimer':null,
+  body:`<fieldset class="fs" ${ro?'disabled':''}><div class="fgrid"><label class="f">Fournisseur<select class="inp" name="four" id="fa-four" required><option value="">— Choisir —</option>${fourList().map(x=>`<option value="${esc(x.id)}" ${f.four===x.id?'selected':''}>${esc(x.nom)}</option>`).join('')}<option value="__new">+ Nouveau fournisseur…</option></select></label>
+  <label class="f">Catégorie<select class="inp" name="cat" id="fa-cat">${FACT_CATS.map(c=>`<option ${f.cat===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label></div>
+  <div class="fgrid"><label class="f">Date de la facture<input class="inp" type="date" name="date" id="fa-date" value="${esc(f.date)}" required></label><label class="f">N° de facture<input class="inp" name="num" id="fa-num" value="${esc(f.num||'')}"></label><label class="f">Montant (DH)<input class="inp num" type="number" step="0.01" min="0" name="montant" id="fa-mt" value="${esc(f.montant)}" required></label></div>
+  <div class="stack" style="gap:6px"><b>Photos de la facture</b><div class="cthumbs" id="fa-ph">${thumbsHTML(f.photos,ro?'':'ph')}</div>${ro?'':`<button type="button" class="btn ghost" id="fa-addph" style="align-self:flex-start">${ic('img')}Photographier ou joindre la facture</button>`}</div>
+  <div class="stack" style="gap:8px"><b>Paiements</b><div id="fa-pays" class="stack" style="gap:6px"></div>${ro?'':`<button type="button" class="btn ghost" id="fa-addpay" style="align-self:flex-start">${ic('plus')}Ajouter un paiement</button>`}</div>
+  <label class="f">Note<input class="inp" name="note" id="fa-note" value="${esc(f.note||'')}"></label></fieldset>`,
+  onOk:async v=>{if(!v.four||v.four==='__new'){toast('Choisissez le fournisseur.','err');return false}const mt=Number(String(v.montant).replace(',','.'));if(!(mt>=0)||v.montant===''){toast('Indiquez le montant.','err');return false}
+   const data={four:v.four,fourNom:fourName(v.four),cat:v.cat,date:v.date,num:v.num.trim(),montant:mt,photos:f.photos,paiements:f.paiements.filter(p=>Number(p.montant)>0),note:v.note.trim(),maj:Date.now(),par:S.uid};
+   return f.id?W(()=>S.db.doc('factures/'+f.id).update(data),'Facture enregistrée'):W(()=>S.db.collection('factures').add({...data,cree:Date.now(),creePar:S.uid}),'Facture ajoutée')},
+  onDel:async()=>{if(!await ask('Supprimer cette facture ?','Supprimer'))return false;return W(()=>S.db.doc('factures/'+f.id).delete(),'Facture supprimée')}});
+ const drawPays=()=>{$('#fa-pays',d).innerHTML=f.paiements.length?f.paiements.map((p,i)=>`<div class="paycard"><div class="fgrid"><label class="f">Date<input class="inp" type="date" data-pi="${i}" data-k="date" value="${esc(p.date||'')}"></label><label class="f">Montant<input class="inp num" type="number" step="0.01" data-pi="${i}" data-k="montant" value="${esc(p.montant||'')}"></label>
+   <label class="f">Mode<select class="inp" data-pi="${i}" data-k="mode">${Object.entries(PAY_MODES).map(([k,l])=>`<option value="${k}" ${p.mode===k?'selected':''}>${l}</option>`).join('')}</select></label></div>
+   <div class="row" style="gap:6px;align-items:center"><div class="cthumbs">${thumbsHTML(p.photos,ro?'':'pp'+i)}</div><span class="sp"></span>${ro?'':`<button type="button" class="btn ghost" data-payph="${i}">${ic('img')}Preuve de paiement</button><button type="button" class="ib" data-paydel="${i}" aria-label="Retirer">${ic('trash')}</button>`}</div></div>`).join(''):'<div class="small muted">Aucun paiement enregistré.</div>'};
+ drawPays();
+ d.addEventListener('input',e=>{const el=e.target.closest('[data-pi]');if(el){const p=f.paiements[+el.dataset.pi];p[el.dataset.k]=el.dataset.k==='montant'?Number(el.value):el.value}});
+ d.addEventListener('change',e=>{const el=e.target.closest('[data-pi]');if(el){const p=f.paiements[+el.dataset.pi];p[el.dataset.k]=el.dataset.k==='montant'?Number(el.value):el.value}});
+ d.addEventListener('click',async e=>{const rm=e.target.closest('[data-rm]');if(rm){const k=rm.dataset.rm,i=+rm.dataset.i;if(k==='ph'){f.photos.splice(i,1);$('#fa-ph',d).innerHTML=thumbsHTML(f.photos,'ph')}else{f.paiements[+k.slice(2)].photos.splice(i,1);drawPays()}return}
+  const pp=e.target.closest('[data-payph]');if(pp){const fs=await pickFiles('image/*,application/pdf',true);if(!fs.length)return;const up=await uploadFiles(fs);const p=f.paiements[+pp.dataset.payph];p.photos=[...(p.photos||[]),...up];drawPays();return}
+  const pd=e.target.closest('[data-paydel]');if(pd){f.paiements.splice(+pd.dataset.paydel,1);drawPays()}});
+ if(!ro){$('#fa-addph',d).onclick=async()=>{if(!S.assets){toast('Envoi de fichiers indisponible.','err');return}const fs=await pickFiles('image/*,application/pdf',true);if(!fs.length)return;f.photos.push(...await uploadFiles(fs));$('#fa-ph',d).innerHTML=thumbsHTML(f.photos,'ph')};
+  $('#fa-addpay',d).onclick=()=>{const reste=Math.max(0,(Number($('#fa-mt',d).value)||0)-factPaye(f));f.paiements.push({date:today(),montant:reste||'',mode:'virement',photos:[]});drawPays()};
+  $('#fa-four',d).onchange=e=>{if(e.target.value==='__new'){e.target.value='';toast('Ajoutez d\'abord le fournisseur dans l\'onglet « Fournisseurs ».')}}}}
+
+/* Assurances */
+function assView(B){const F=S.aF||{from:today().slice(0,7)+'-01',to:today(),sel:[]};S.aF=F;const comps=[...new Set([...ASSUREURS,...(S.assur||[]).map(a=>a.assureur)])].filter(Boolean);
+ const L=(S.assur||[]).filter(a=>(!F.from||a.date>=F.from)&&(!F.to||a.date<=F.to)&&(!F.sel.length||F.sel.includes(a.assureur)));
+ const tot=L.reduce((t,a)=>t+(Number(a.montant)||0),0);const per={};L.forEach(a=>{const o=per[a.assureur]=per[a.assureur]||{n:0,t:0};o.n++;o.t+=Number(a.montant)||0});
+ B.innerHTML=`<section class="card stack" style="gap:10px"><h3>Calcul des montants déclarés</h3><div class="fgrid"><label class="f">Du<input class="inp" type="date" id="af-from" value="${esc(F.from)}"></label><label class="f">Au<input class="inp" type="date" id="af-to" value="${esc(F.to)}"></label></div>
+  <div class="small muted">Compagnies (aucune sélection = toutes) :</div><div class="chips">${comps.map(c=>`<button class="chip" aria-pressed="${F.sel.includes(c)}" data-act="assSel" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+  <div class="mini-kpis"><div class="kpi"><b>${MAD0(tot)}</b><span class="small muted">total déclaré</span></div><div class="kpi"><b>${L.length}</b><span class="small muted">feuille(s) de soins</span></div></div>
+  ${Object.keys(per).length>1?`<div class="list">${Object.entries(per).sort((a,b)=>b[1].t-a[1].t).map(([k,o])=>`<div class="li"><div class="grow"><div class="t">${esc(k)}</div><div class="s">${o.n} feuille(s)</div></div><b class="num">${MAD0(o.t)}</b></div>`).join('')}</div>`:''}</section>
+ <section class="card" style="padding-block:4px">${L.length?L.map(a=>`<div class="li" style="cursor:pointer" data-act="assEdit" data-id="${esc(a.id)}"><div class="grow"><div class="t">${esc(a.patient||'Patient')}</div><div class="s">${esc(a.assureur||'')} · ${esc(fmtDate(a.date,{day:'numeric',month:'short',year:'numeric'}))}${a.acte?' · '+esc(a.acte):''}</div></div><div style="text-align:right"><b class="num">${MAD0(a.montant)}</b><div><span class="pill ${a.statut==='rembourse'?'ok':''}">${esc(ASS_STATUTS[a.statut]||'Feuille remplie')}</span></div></div></div>`).join(''):'<div class="empty"><strong>Aucune feuille d\'assurance sur cette période</strong></div>'}</section>`;
+ const up=()=>{F.from=$('#af-from').value;F.to=$('#af-to').value;assView(B)};$('#af-from').onchange=up;$('#af-to').onchange=up}
+function assEdit(id){const a=(S.assur||[]).find(x=>x.id===id)||{date:today(),assureur:'CNOPS',statut:'rempli'};const ro=!perm('compta_edit');S.patPick={};
+ const d=openModal({title:a.id?'Feuille d\'assurance':'Nouvelle feuille d\'assurance',ok:ro?null:'Enregistrer',cancel:ro?'Fermer':'Annuler',del:a.id&&!ro?'Supprimer':null,
+  body:`<fieldset class="fs" ${ro?'disabled':''}><label class="f">Patient<input class="inp" name="patient" id="as-pat" value="${esc(a.patient||'')}" autocomplete="off" required></label>
+  <div class="fgrid"><label class="f">Compagnie d'assurance<input class="inp" name="assureur" id="as-comp" list="dl-ass" value="${esc(a.assureur||'')}" required></label><label class="f">Date<input class="inp" type="date" name="date" id="as-date" value="${esc(a.date)}" required></label></div>
+  <div class="fgrid"><label class="f">Montant déclaré (DH)<input class="inp num" type="number" step="0.01" min="0" name="montant" id="as-mt" value="${esc(a.montant??'')}" required></label><label class="f">Statut<select class="inp" name="statut" id="as-st">${Object.entries(ASS_STATUTS).map(([k,l])=>`<option value="${k}" ${a.statut===k?'selected':''}>${l}</option>`).join('')}</select></label></div>
+  <label class="f">Soins déclarés<input class="inp" name="acte" id="as-acte" value="${esc(a.acte||'')}" placeholder="Ex. : Couronne zircone 36, détartrage"></label>
+  <datalist id="dl-ass">${ASSUREURS.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></fieldset>`,
+  onOk:async v=>{const mt=Number(String(v.montant).replace(',','.'));if(!v.patient.trim()||!v.assureur.trim()||!(mt>=0)||v.montant===''){toast('Indiquez le patient, la compagnie et le montant.','err');return false}
+   const pk=S.patPick[v.patient];const data={patient:(pk?.nom||v.patient).trim(),patientId:pk?.id||a.patientId||null,assureur:v.assureur.trim(),date:v.date,montant:mt,statut:v.statut,acte:v.acte.trim(),maj:Date.now(),par:S.uid};
+   return a.id?W(()=>S.db.doc('assurances/'+a.id).update(data),'Feuille enregistrée'):W(()=>S.db.collection('assurances').add({...data,cree:Date.now(),creePar:S.uid}),'Feuille ajoutée')},
+  onDel:async()=>{if(!await ask('Supprimer cette feuille d\'assurance ?','Supprimer'))return false;return W(()=>S.db.doc('assurances/'+a.id).delete(),'Feuille supprimée')}});
+ if(!ro&&(perm('pat_voir')||perm('pat_liste')))patSuggest($('#as-pat',d))}
+
+/* Fournisseurs et laboratoires */
+function fourStats(id){const F=(S.factures||[]).filter(f=>f.four===id);const t=F.reduce((s,f)=>s+(Number(f.montant)||0),0),p=F.reduce((s,f)=>s+factPaye(f),0);return{n:F.length,t,p,r:t-p}}
+function contactBtns(x){return `${x.tel?`<a class="ib" href="tel:${esc(telLink(x.tel))}" aria-label="Appeler" title="Appeler">${ic('phone')}</a>`:''}${(x.wa||x.tel)?`<a class="ib" href="${esc(waLink(x.wa||x.tel))}" target="_blank" rel="noopener" aria-label="WhatsApp" title="WhatsApp">${ic('chat')}</a>`:''}${x.email?`<a class="ib" href="mailto:${esc(x.email)}" aria-label="E-mail" title="E-mail">${ic('mail')}</a>`:''}`}
+function fourView(B){const L=fourList();const money=perm('compta_voir');
+ B.innerHTML=Object.entries(FOUR_TYPES).map(([k,l])=>{const G=L.filter(x=>(x.type||'materiel')===k);if(!G.length)return '';
+  return `<section class="card" style="padding-block:4px"><h3 style="padding:10px 2px 4px">${esc(l)}s</h3>${G.map(x=>{const st=money?fourStats(x.id):null;return `<div class="li"><div class="grow" style="cursor:pointer" data-act="fourOpen" data-id="${esc(x.id)}"><div class="t">${esc(x.nom)}</div><div class="s">${esc([x.contact,x.tel,x.ville].filter(Boolean).join(' · ')||'Aucun contact')}</div>${st&&st.n?`<div class="s">${st.n} facture(s) · payé ${MAD0(st.p)}${st.r>0.5?` · <b style="color:var(--bad)">doit ${MAD0(st.r)}</b>`:' · soldé'}</div>`:''}</div><div class="row" style="gap:4px">${contactBtns(x)}</div></div>`}).join('')}</section>`}).join('')||'<div class="card"><div class="empty"><strong>Aucun fournisseur enregistré</strong>Ajoutez vos laboratoires et vos fournisseurs de matériel avec leurs coordonnées (téléphone, WhatsApp, e-mail).</div></div>'}
+function fourOpen(id){const x=S.four?.[id];if(!x)return;const money=perm('compta_voir');const st=money?fourStats(id):null;
+ const F=money?(S.factures||[]).filter(f=>f.four===id).sort((a,b)=>a.date<b.date?1:-1):[];
+ const W2=perm('labo_voir')?(S.labo||[]).filter(c=>c.section==='externe'&&norm(c.laboExt)===norm(x.nom)):[];
+ const items=(S.stock||[]).filter(i=>(i.fourIds||[]).includes(id));
+ openModal({title:x.nom,ok:null,cancel:'Fermer',
+  body:`${perm('compta_edit')?`<button type="button" class="btn ghost" data-act="fourEdit" data-id="${esc(id)}" style="align-self:flex-start">${ic('edit')}Modifier les coordonnées</button>`:''}<div class="small muted">${esc(FOUR_TYPES[x.type||'materiel'])}${x.contact?' · '+esc(x.contact):''}</div><div class="row" style="gap:6px">${contactBtns(x)}</div>
+  <dl class="dl">${[['Téléphone',x.tel],['WhatsApp',x.wa],['E-mail',x.email],['Adresse',[x.adresse,x.ville].filter(Boolean).join(', ')],['Notes',x.notes]].filter(r=>r[1]).map(([k,v])=>`<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+  ${st?`<div class="mini-kpis"><div class="kpi"><b>${MAD0(st.t)}</b><span class="small muted">facturé</span></div><div class="kpi"><b>${MAD0(st.p)}</b><span class="small muted">payé</span></div><div class="kpi"><b style="color:${st.r>0.5?'var(--bad)':'var(--ok)'}">${MAD0(st.r)}</b><span class="small muted">reste dû</span></div></div>
+  <div class="list">${F.map(f=>`<div class="li" style="cursor:pointer" data-act="factEdit" data-id="${esc(f.id)}"><div class="grow"><div class="t">${esc(fmtDate(f.date,{day:'numeric',month:'short',year:'numeric'}))}${f.num?' · n° '+esc(f.num):''}</div><div class="s">${esc(f.cat||'')}</div></div><b class="num">${MAD0(f.montant)}</b>${factReste(f)>0.5?`<span class="pill bad">${MAD0(factReste(f))}</span>`:'<span class="pill ok">soldée</span>'}</div>`).join('')||'<div class="small muted">Aucune facture.</div>'}</div>`:''}
+  ${W2.length?`<h3>Travaux confiés (${W2.length})${money&&W2.some(c=>c.prix)?` · valeur ${MAD0(W2.reduce((t,c)=>t+(Number(c.prix)||0),0))}`:''}</h3><div class="list">${W2.map(c=>`<div class="li" style="cursor:pointer" data-act="labOpen" data-id="${esc(c.id)}"><div class="grow"><div class="t">${esc(c.patient||'')}</div><div class="s">${esc([c.travail,c.dents?'dent '+c.dents:''].filter(Boolean).join(', '))} · ${esc(LAB.externe.steps[labStepIdx(c)]?.[1]||'')}${money&&c.prix?' · '+MAD0(c.prix):''}</div></div>${labDue(c)}</div>`).join('')}</div>`:''}
+  ${items.length?`<h3>Articles fournis (${items.length})</h3><div class="small">${items.map(i=>esc(i.nom)).join(', ')}</div>`:''}`})}
+function fourEdit(id){const x=S.four?.[id]||{type:'materiel'};
+ openModal({title:x.id?'Modifier '+x.nom:'Nouveau fournisseur',del:x.id?'Supprimer':null,
+  body:`<label class="f">Nom de la société ou du laboratoire<input class="inp" name="nom" id="fo-nom" value="${esc(x.nom||'')}" required></label>
+  <div class="fgrid"><label class="f">Type<select class="inp" name="type" id="fo-type">${Object.entries(FOUR_TYPES).map(([k,l])=>`<option value="${k}" ${x.type===k?'selected':''}>${l}</option>`).join('')}</select></label><label class="f">Personne à contacter<input class="inp" name="contact" id="fo-contact" value="${esc(x.contact||'')}"></label></div>
+  <div class="fgrid"><label class="f">Téléphone<input class="inp" type="tel" name="tel" id="fo-tel" value="${esc(x.tel||'')}"></label><label class="f">WhatsApp (si différent)<input class="inp" type="tel" name="wa" id="fo-wa" value="${esc(x.wa||'')}"></label></div>
+  <div class="fgrid"><label class="f">E-mail<input class="inp" type="email" name="email" id="fo-mail" value="${esc(x.email||'')}"></label><label class="f">Ville<input class="inp" name="ville" id="fo-ville" value="${esc(x.ville||'')}"></label></div>
+  <label class="f">Adresse<input class="inp" name="adresse" id="fo-adr" value="${esc(x.adresse||'')}"></label><label class="f">Notes (RIB, conditions, délais…)<textarea class="inp" name="notes" id="fo-notes" rows="2">${esc(x.notes||'')}</textarea></label>`,
+  onOk:v=>{if(!v.nom.trim()){toast('Indiquez le nom.','err');return false}const data={nom:v.nom.trim(),type:v.type,contact:v.contact.trim(),tel:v.tel.trim(),wa:v.wa.trim(),email:v.email.trim(),ville:v.ville.trim(),adresse:v.adresse.trim(),notes:v.notes.trim(),maj:Date.now(),par:S.uid};
+   return x.id?W(()=>S.db.doc('fournisseurs/'+x.id).update(data),'Fournisseur enregistré'):W(()=>S.db.collection('fournisseurs').add({...data,cree:Date.now()}),'Fournisseur ajouté')},
+  onDel:async()=>{if(!await ask('Supprimer « '+x.nom+' » ? Ses factures restent enregistrées.','Supprimer'))return false;return W(()=>S.db.doc('fournisseurs/'+x.id).delete(),'Fournisseur supprimé')}})}
+
 /* ---- Rapports de fin de journée (administrateur) ---- */
-Views.rapports={mount(el){el.innerHTML=`<div class="stack"><div class="head"><div><div class="eyebrow">Administration</div><h1>Rapports du jour</h1><div class="muted">Envoyé automatiquement chaque soir à 20 h 30.</div></div><span class="sp"></span>
-  <button class="btn ghost" data-act="rapNow">${ic('refresh')}Générer maintenant</button></div>${banners()}<div class="chips" id="rapDates"></div><div id="rapOut" class="stack"><div class="small muted">Chargement…</div></div></div>`;loadRapports()},update(){}};
-async function loadRapports(){if(!S.db)return;try{const s=await S.db.collection('rapports').orderBy('cree','desc').limit(30).get();S.rapList=s.docs.map(d=>({id:d.id,...d.data()}));}catch(e){S.rapList=[]}
- if(!S.rapSel||!S.rapList.some(r=>r.id===S.rapSel))S.rapSel=S.rapList[0]?.id;drawRapport()}
-function drawRapport(){const D=$('#rapDates'),O=$('#rapOut');if(!O)return;const L=S.rapList||[];
- D.innerHTML=L.map(r=>`<button class="chip" aria-pressed="${r.id===S.rapSel}" data-act="rapPick" data-d="${esc(r.id)}">${esc(capFirst(fmtDate(r.id,{weekday:'short',day:'numeric',month:'short'})))}</button>`).join('');
- const R=L.find(r=>r.id===S.rapSel);if(!R){O.innerHTML='<div class="card"><div class="empty"><strong>Aucun rapport pour le moment</strong>Le premier rapport sera créé ce soir à 20 h 30, ou maintenant avec « Générer maintenant ».</div></div>';return}
+const RAP_P={jour:'Jour',semaine:'Semaine',mois:'Mois',annee:'Année'};
+function rapRange(){const p=S.rapP||'jour',d=S.rapD||today();
+ if(p==='jour')return[d,d];if(p==='semaine'){const dt=new Date(d+'T12:00:00');const a=addDays(d,-((dt.getDay()+6)%7));return[a,addDays(a,6)]}
+ if(p==='mois'){const a=d.slice(0,7)+'-01';const n=new Date(+d.slice(0,4),+d.slice(5,7),0).getDate();return[a,d.slice(0,7)+'-'+pad(n)]}return[d.slice(0,4)+'-01-01',d.slice(0,4)+'-12-31']}
+function rapShift(n){const p=S.rapP||'jour',d=S.rapD||today();let x;
+ if(p==='jour')x=addDays(d,n);else if(p==='semaine')x=addDays(d,7*n);else if(p==='mois'){const dt=new Date(+d.slice(0,4),+d.slice(5,7)-1+n,1);x=dt.getFullYear()+'-'+pad(dt.getMonth()+1)+'-01'}else x=(+d.slice(0,4)+n)+d.slice(4);
+ S.rapD=x>today()?today():x;loadRapports()}
+Views.rapports={mount(el){el.innerHTML=`<div class="stack"><div class="head"><div><div class="eyebrow">Administration</div><h1>Rapports</h1><div class="muted">Rapport du jour envoyé automatiquement chaque soir à 20 h 30.</div></div></div>${banners()}
+  <div class="chips">${Object.entries(RAP_P).map(([k,v])=>`<button class="chip" aria-pressed="${(S.rapP||'jour')===k}" data-act="rapP" data-p="${k}">${v}</button>`).join('')}</div>
+  <div class="row" style="gap:6px"><button class="ib" data-act="rapShift" data-n="-1" aria-label="Précédent">${ic('left')}</button><input class="inp" type="date" id="rapD" value="${esc(S.rapD||today())}" max="${today()}" style="width:auto"><button class="ib" data-act="rapShift" data-n="1" aria-label="Suivant">${ic('right')}</button><span class="sp"></span><span class="small muted" id="rapLbl"></span></div>
+  <div id="rapOut" class="stack"><div class="small muted">Chargement…</div></div></div>`;
+  $('#rapD').onchange=e=>{S.rapD=e.target.value||today();loadRapports()};loadRapports()},update(){}};
+async function loadRapports(){const O=$('#rapOut');if(!O||!S.db)return;const[a,b]=rapRange();const L=$('#rapLbl');
+ if(L)L.textContent=a===b?capFirst(fmtDate(a,{weekday:'long',day:'numeric',month:'long',year:'numeric'})):`du ${fmtDate(a,{day:'numeric',month:'short',year:'numeric'})} au ${fmtDate(b,{day:'numeric',month:'short',year:'numeric'})}`;
+ const I=$('#rapD');if(I)I.value=S.rapD||today();O.innerHTML='<div class="small muted">Chargement…</div>';
+ let list=[];try{const s=await S.db.collection('rapports').where('date','>=',a).where('date','<=',b).get();list=s.docs.map(d=>({id:d.id,...d.data()})).sort((x,y)=>x.date<y.date?-1:1)}catch(e){O.innerHTML='<div class="banner">Chargement impossible.</div>';return}
+ S.rapList=list;const days=[];for(let x=a;x<=b&&x<=today();x=addDays(x,1))days.push(x);const have=new Set(list.map(r=>r.date));const miss=days.filter(x=>!have.has(x)&&x<today());
+ const gen=miss.length?`<div class="banner info" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="flex:1">${miss.length} jour(s) sans rapport sur cette période.</span><button class="btn ghost" data-act="rapGen">${ic('refresh')}Générer ${miss.length>1?'les jours manquants':'ce jour'}</button></div>`:'';
+ const nowBtn=a===b&&a===today()?`<button class="btn ghost" data-act="rapNow" style="align-self:flex-start">${ic('refresh')}Générer le rapport d'aujourd'hui maintenant</button>`:'';
+ S.rapMiss=miss;
+ if(a===b){const R=list[0];O.innerHTML=gen+nowBtn+(R?rapDayHTML(R):(miss.length?'':'<div class="card"><div class="empty"><strong>Pas encore de rapport</strong>Le rapport de ce jour sera créé ce soir à 20 h 30.</div></div>'));return}
+ O.innerHTML=gen+(list.length?rapAggHTML(list,a,b):'<div class="card"><div class="empty"><strong>Aucun rapport sur cette période</strong></div></div>')}
+function rapAggHTML(L,a,b){const MD=n=>MAD0(n);const A={rdv:{total:0,termines:0,absents:0,annules:0},type:{},caisse:{total:0,n:0,mode:{}},corr:0,nouv:0,msg:0,soins:0,pt:{}};
+ L.forEach(R=>{const r=R.rdv||{};['total','termines','absents','annules'].forEach(k=>A.rdv[k]+=r[k]||0);Object.entries(r.parType||{}).forEach(([k,v])=>A.type[k]=(A.type[k]||0)+v);A.soins+=(r.soins||[]).length;
+  const c=R.caisse||{};A.caisse.total+=c.total||0;A.caisse.n+=c.n||0;Object.entries(c.parMode||{}).forEach(([k,v])=>A.caisse.mode[k]=(A.caisse.mode[k]||0)+v);A.corr+=(c.corrections||[]).length;
+  A.nouv+=(R.nouveauxPatients||[]).length;A.msg+=R.messages?.total||0;
+  (R.pointage||[]).forEach(p=>{const o=A.pt[p.nom]=A.pt[p.nom]||{jours:0,min:0,ret:0,retMin:0,abs:0,av:0};if(p.arrivee){o.jours++;o.min+=p.minutes||0}if(p.retard){o.ret++;o.retMin+=p.retard}if(p.absent)o.abs++;if(p.avance)o.av++})});
+ const year=(S.rapP==='annee');const groups={};L.forEach(R=>{const k=year?R.date.slice(0,7):R.date;const g=groups[k]=groups[k]||{c:0,t:0};g.c+=R.caisse?.total||0;g.t+=R.rdv?.termines||0});const maxC=Math.max(1,...Object.values(groups).map(g=>g.c));
+ const li=(x,y)=>`<div class="li"><div class="grow"><div class="t">${x}</div></div><span class="small">${y}</span></div>`;
+ return `<div class="small muted">${L.length} rapport(s) journalier(s) cumulé(s).</div>
+ <div class="grid2"><section class="card"><h3>Rendez-vous</h3><div class="mini-kpis"><div class="kpi"><b>${A.rdv.total}</b><span class="small muted">prévus</span></div><div class="kpi"><b>${A.rdv.termines}</b><span class="small muted">terminés</span></div><div class="kpi"><b style="color:${A.rdv.absents?'var(--bad)':'inherit'}">${A.rdv.absents}</b><span class="small muted">absents</span></div><div class="kpi"><b>${A.rdv.annules}</b><span class="small muted">annulés</span></div></div>
+  <div class="small muted">${A.soins} séance(s) avec soins notés · ${A.nouv} nouveau(x) patient(s) · ${A.msg} message(s)</div><div class="list">${Object.entries(A.type).sort((x,y)=>y[1]-x[1]).map(([k,v])=>li(esc(k),v)).join('')}</div></section>
+ <section class="card"><h3>Caisse <span class="pill acc">Visible par vous seul</span></h3><div class="mini-kpis"><div class="kpi"><b>${MD(A.caisse.total)}</b><span class="small muted">${A.caisse.n} encaissement(s)</span></div><div class="kpi"><b>${MD(A.caisse.total/Math.max(1,L.filter(R=>R.caisse?.n).length))}</b><span class="small muted">moyenne par jour travaillé</span></div></div>
+  <div class="list">${Object.entries(A.caisse.mode).map(([k,v])=>li(esc(MODES[k]||k),MD(v))).join('')}</div>${A.corr?`<div class="small" style="color:var(--bad)">${A.corr} correction(s) d'encaissement sur la période.</div>`:''}</section></div>
+ <section class="card"><h3>${year?'Par mois':'Par jour'}</h3><div class="list">${Object.keys(groups).sort().map(k=>`<div class="li" ${year?'':`style="cursor:pointer" data-act="rapDay" data-d="${k}"`}><span style="width:10ch" class="small">${esc(year?fmtMonth(k):capFirst(fmtDate(k,{weekday:'short',day:'numeric',month:'short'})))}</span><div class="grow"><div class="progress"><i style="width:${Math.round(groups[k].c/maxC*100)}%"></i></div></div><span class="num small" style="min-width:16ch;text-align:right">${MD(groups[k].c)} · ${groups[k].t} RDV</span></div>`).join('')}</div></section>
+ <section class="card"><h3>Pointage de l'équipe</h3><div class="tablewrap"><table><thead><tr><th>Membre</th><th class="r">Jours</th><th class="r">Présence</th><th class="r">Retards</th><th class="r">Absences</th><th class="r">Départs anticipés</th></tr></thead><tbody>${Object.entries(A.pt).map(([n,o])=>`<tr><td>${esc(n)}</td><td class="r num">${o.jours}</td><td class="r num">${dur(o.min*60000)}</td><td class="r num">${o.ret?`<span class="pill bad">${o.ret} · ${o.retMin} min</span>`:'0'}</td><td class="r num">${o.abs?`<span class="pill bad">${o.abs}</span>`:'0'}</td><td class="r num">${o.av||0}</td></tr>`).join('')}</tbody></table></div></section>`}
+function rapDayHTML(R){R={...R,id:R.date||R.id};const out=document.createElement('div');S._rapTmp=R;return rapDayInner(R)}
+function rapDayInner(R){
  const li=(a,b)=>`<div class="li"><div class="grow"><div class="t">${a}</div></div><span class="small">${b}</span></div>`;const MD=n=>MAD0(n);const r=R.rdv||{};const c=R.caisse||{};
- O.innerHTML=`<div class="small muted">${esc(capFirst(fmtDate(R.id,{weekday:'long',day:'numeric',month:'long',year:'numeric'})))} · généré à ${hm(R.cree)}</div>
+ return `<div class="small muted">${esc(capFirst(fmtDate(R.id,{weekday:'long',day:'numeric',month:'long',year:'numeric'})))} · généré à ${hm(R.cree)}</div>
  <div class="grid2"><section class="card"><h3>Rendez-vous</h3><div class="mini-kpis"><div class="kpi"><b>${r.total||0}</b><span class="small muted">prévus</span></div><div class="kpi"><b>${r.termines||0}</b><span class="small muted">terminés</span></div><div class="kpi"><b style="color:${r.absents?'var(--bad)':'inherit'}">${r.absents||0}</b><span class="small muted">absents</span></div><div class="kpi"><b>${r.annules||0}</b><span class="small muted">annulés</span></div></div>
   ${r.nonClotures?`<div class="banner warn">${r.nonClotures} rendez-vous non clôturé(s) dans l'agenda.</div>`:''}<div class="list">${Object.entries(r.parType||{}).map(([k,v])=>li(esc(k),v)).join('')}</div></section>
  <section class="card"><h3>Caisse <span class="pill acc">Visible par vous seul</span></h3><div class="mini-kpis"><div class="kpi"><b>${MD(c.total)}</b><span class="small muted">${c.n||0} encaissement(s)</span></div></div><div class="list">${Object.entries(c.parMode||{}).map(([k,v])=>li(esc(MODES[k]||k),MD(v))).join('')}</div>
@@ -1783,7 +1939,7 @@ async function purge(k){const conf={messages:['ts',180,'les messages de plus de 
   toast(n?`${n} élément${n>1?'s':''} supprimé${n>1?'s':''}`+(n===300?' (relancez pour continuer)':''):'Rien à supprimer')}catch(e){console.warn(e);toast(errMsg(e),'err')}}
 
 /* ---------- actions ---------- */
-const Acts={rapPick:a=>{S.rapSel=a.dataset.d;drawRapport()},rapNow:async a=>{if(!await W(()=>S.db.doc('cfg/rapportDemande').set({date:today(),ts:Date.now()})))return;a.disabled=true;a.textContent='Génération en cours…';S.rapSel=today();setTimeout(loadRapports,9000);setTimeout(()=>{loadRapports();a.disabled=false;a.textContent='Générer maintenant'},25000)},horairesEdit,demo:a=>demoStart(a.dataset.u),demoExit,demoSite:()=>{S.demoSite=S.demoSite==='out'?'in':'out';restartData();renderNav();if(!allowedView(S.view))go('accueil');else go(S.view)},siteRetry:()=>{setSite('checking');if(siteWatch!=null){navigator.geolocation.clearWatch(siteWatch);siteWatch=null}startSite()},
+const Acts={cTab:a=>{S.cTab=a.dataset.t;go('compta')},factEdit:a=>factEdit(a.dataset.id),assEdit:a=>assEdit(a.dataset.id),fourEdit:a=>fourEdit(a.dataset.id),fourOpen:a=>fourOpen(a.dataset.id),assSel:a=>{const F=S.aF;const c=a.dataset.c;F.sel=F.sel.includes(c)?F.sel.filter(x=>x!==c):[...F.sel,c];Views.compta.update()},rapP:a=>{S.rapP=a.dataset.p;go('rapports')},rapShift:a=>rapShift(+a.dataset.n),rapDay:a=>{S.rapP='jour';S.rapD=a.dataset.d;go('rapports')},rapGen:async a=>{const m=S.rapMiss||[];if(!m.length)return;a.disabled=true;a.textContent='Génération en cours… ('+m.length+' jours)';for(let i=0;i<m.length;i+=31){await W(()=>S.db.doc('cfg/rapportDemande').set({dates:m.slice(i,i+31),ts:Date.now()}));await new Promise(r=>setTimeout(r,1500))}toast('Génération lancée : les rapports apparaissent en quelques minutes.');setTimeout(loadRapports,20000);setTimeout(loadRapports,60000)},rapNow:async a=>{if(!await W(()=>S.db.doc('cfg/rapportDemande').set({date:today(),ts:Date.now()})))return;a.disabled=true;a.textContent='Génération en cours…';S.rapP='jour';S.rapD=today();setTimeout(loadRapports,9000);setTimeout(()=>{loadRapports();a.disabled=false;a.textContent='Générer maintenant'},25000)},horairesEdit,demo:a=>demoStart(a.dataset.u),demoExit,demoSite:()=>{S.demoSite=S.demoSite==='out'?'in':'out';restartData();renderNav();if(!allowedView(S.view))go('accueil');else go(S.view)},siteRetry:()=>{setSite('checking');if(siteWatch!=null){navigator.geolocation.clearWatch(siteWatch);siteWatch=null}startSite()},
  more:openMore,pointer,
  startTpl:a=>{if(perm('mod_checklists'))startTpl(a.dataset.id)},
  resumeRun:a=>{S.run=a.dataset.id;S.runLocal=null;go('checklists')},
@@ -1868,6 +2024,8 @@ function startData(){if(S.dataStarted||gated())return;S.dataStarted=true;const d
  if(perm('mod_groupes')){const acc={};myGroups().forEach(g=>addSub(db.collection('messages').where('groupe','==',g.id).orderBy('ts','desc').limit(20).onSnapshot(s=>{acc[g.id]=s.docs.map(d=>({id:d.id,...d.data()}));S.latest=Object.values(acc).flat().sort((a,b)=>b.ts-a.ts);refresh('accueil','groupes')},w)))}
  if(perm('mod_stock')||perm('labo_voir'))addSub(db.collection('stock').onSnapshot(s=>{S.stock=s.docs.map(d=>({id:d.id,...d.data()}));refresh('stock','accueil','labo')},w));
  if(perm('labo_voir'))addSub(db.collection('labo').orderBy('maj','desc').limit(500).onSnapshot(s=>{S.labo=s.docs.map(d=>({id:d.id,...d.data()}));refresh('labo','accueil','patients');const P=$('#labPhotos');if(P){const c=S.labo.find(x=>x.id===P.dataset.id);if(c)P.innerHTML=labPhotosHTML(c)}},w));
+ if(perm('compta_voir')||perm('mod_stock')||perm('labo_voir'))addSub(db.collection('fournisseurs').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]={id:d.id,...d.data()});S.four=o;refresh('compta','stock','labo')},w));
+ if(perm('compta_voir')){addSub(db.collection('factures').orderBy('date','desc').limit(1500).onSnapshot(s=>{S.factures=s.docs.map(d=>({id:d.id,...d.data()}));refresh('compta')},w));addSub(db.collection('assurances').orderBy('date','desc').limit(3000).onSnapshot(s=>{S.assur=s.docs.map(d=>({id:d.id,...d.data()}));refresh('compta')},w))}
  if(perm('mod_checklists'))addSub(db.collection('executions').where('date','==',today()).onSnapshot(s=>{S.execToday=s.docs.map(d=>({id:d.id,...d.data()}));refresh('checklists','accueil')},w));
  if(perm('mod_pointage'))addSub(db.doc(`pointage/${S.uid}/j/${today()}`).onSnapshot(s=>{S.myPointage=s.exists?s.data():null;refresh('accueil','pointage')},w));
  if(perm('caisse'))addSub(db.collection(`recettes/${S.uid}/e`).where('date','==',today()).onSnapshot(s=>{S.myRecCount=s.size;S.myRec=s.docs.map(d=>({id:d.id,...d.data()}));refresh('caisse')},w));
