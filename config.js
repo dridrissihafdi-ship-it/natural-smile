@@ -11,6 +11,8 @@ self.NS_CONFIG = {
     appId: "1:795758483495:web:61879f14cdcbaf49819602"
   },
   // Clé publique Web Push (Cloud Messaging).
+  // Clé de site reCAPTCHA v3 pour App Check (laisser vide tant qu'App Check n'est pas configuré).
+  appCheckKey: "",
   vapidKey: "BC7VE-gplJ0NWzcRQn205S8sBJIPcBifTA-xYDkqEvWU-tATG1rLL_sVPdsFXQRNkRUJgkigLnvMdqN_9XCzacE",
   // Seul compte administrateur (doit aussi figurer dans firestore.rules, storage.rules et functions/index.js).
   adminEmails: ["dr.hafdi.idrissi@gmail.com"]

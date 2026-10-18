@@ -1,5 +1,5 @@
 // Service worker Natural Smile : démarrage rapide, hors connexion et notifications.
-const VERSION = 'ns-v19';
+const VERSION = 'ns-v21';
 importScripts('config.js', 'firebase-app-compat.js', 'firebase-messaging-compat.js');
 try {
   firebase.initializeApp(self.NS_CONFIG.firebase);
@@ -9,7 +9,7 @@ try {
 
 const SHELL = ['./', 'index.html', 'config.js', 'manifest.webmanifest',
   'firebase-app-compat.js', 'firebase-auth-compat.js', 'firebase-firestore-compat.js',
-  'firebase-storage-compat.js', 'firebase-messaging-compat.js',
+  'firebase-storage-compat.js', 'firebase-messaging-compat.js', 'firebase-app-check-compat.js', 'JsBarcode.all.min.js',
   'logo-mark.png', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
