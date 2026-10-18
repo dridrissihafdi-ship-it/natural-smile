@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Natural Smile</title>
 <meta name="description" content="Application interne de Natural Smile Dental Office et de son laboratoire.">
 <meta name="theme-color" content="#fffdf9" media="(prefers-color-scheme: light)">
@@ -134,7 +134,7 @@ main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px
 .chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-size:.86rem;cursor:pointer;font-weight:500}
 .chip[aria-pressed="true"]{background:var(--fg);border-color:var(--fg);color:var(--bg)}
 label.f{position:relative;display:flex;flex-direction:column;gap:6px;font-size:.84rem;font-weight:600;color:var(--muted)}
-.inp{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:11px 13px;font-size:15px;color:var(--fg);min-width:0;transition:border-color .15s,box-shadow .15s}
+.inp{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:11px 13px;font-size:16px;color:var(--fg);min-width:0;transition:border-color .15s,box-shadow .15s}
 .inp:focus{outline:none;border-color:var(--gold-2);box-shadow:0 0 0 3px var(--accent-soft)}
 textarea.inp{resize:vertical;min-height:90px}
 .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
@@ -206,6 +206,13 @@ td.r,th.r{text-align:right}
 .cthumb .x{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:0;background:var(--bad);color:#fff;font-weight:700;cursor:pointer;line-height:1}
 .paycard{border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
 .demo-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:2px solid var(--gold-2)}.demo-bar>svg{width:22px;height:22px}
+.pv{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.94);display:flex;align-items:center;justify-content:center;touch-action:none;overflow:hidden}
+.pv img{max-width:100%;max-height:100%;transform-origin:0 0;will-change:transform;user-select:none;-webkit-user-drag:none}
+.pv .pvx{position:absolute;top:calc(12px + env(safe-area-inset-top));right:14px;width:42px;height:42px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;font-size:24px;cursor:pointer;z-index:2}
+.pv .pvh{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom));left:0;right:0;text-align:center;color:rgba(255,255,255,.7);font-size:.8rem}
+html{touch-action:manipulation}
+.notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}.notes-grid h3{margin:0 0 4px}
+.li.tache input{width:20px;height:20px;accent-color:var(--gold-2);flex:none}
 .site-lock{display:flex;gap:10px;align-items:center}.site-lock>svg{width:22px;height:22px;flex:none}
 .menu-list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .menu-it{display:flex;align-items:center;gap:12px;padding:14px;border:0;border-bottom:1px solid var(--line);background:var(--surface);font:inherit;font-weight:600;color:var(--fg);cursor:pointer;text-align:left}
@@ -559,10 +566,10 @@ const lastSeen=ls.get('ns_seen',{});
 const groups=()=>(S.cfg.groupes?.liste?.length?S.cfg.groupes.liste:DEF_GROUPS);
 const templates=()=>(S.cfg.checklists?.liste?.length?S.cfg.checklists.liste:DEF_CL);
 const reglement=()=>(S.cfg.reglement?.articles?.length?S.cfg.reglement.articles:DEF_REGLEMENT);
-const MODULES=[['pat_liste','Liste des patients (noms et téléphones, sans dossier médical)'],['rdv_voir','Agenda complet'],['rdv_jour','Rendez-vous du jour uniquement (photos, radios, soins, notes)'],['pat_voir','Dossiers patients'],['labo_voir','Laboratoire'],['mod_groupes','Groupes de discussion'],['mod_checklists','Checklists'],['mod_stock','Stock du cabinet'],['caisse','Caisse (saisie des encaissements, sans voir les totaux)'],['compta_voir','Comptabilité : factures, assurances et fournisseurs (avec les montants)'],['mod_pointage','Pointage'],['mod_reglement','Règlement intérieur']];
+const MODULES=[['pat_liste','Liste des patients (noms et téléphones, sans dossier médical)'],['rdv_voir','Agenda complet'],['rdv_jour','Rendez-vous du jour uniquement (photos, radios, soins, notes)'],['pat_voir','Dossiers patients'],['labo_voir','Laboratoire'],['mod_groupes','Groupes de discussion'],['mod_checklists','Checklists'],['mod_stock','Stock du cabinet'],['caisse','Caisse (saisie des encaissements, sans voir les totaux)'],['compta_voir','Comptabilité : factures, assurances et fournisseurs (avec les montants)'],['mod_pointage','Pointage'],['mod_taches','Mes tâches du jour'],['mod_notes','Bloc-notes personnel'],['mod_reglement','Règlement intérieur']];
 const ACTIONS=[['rdv_gerer','Ajouter et modifier des rendez-vous'],['rdv_suppr','Supprimer des rendez-vous'],['pat_edit','Créer et modifier les fiches patients'],['pat_docs','Ajouter des radios et des photos'],['pat_suppr','Supprimer des patients et des fichiers'],['stock_edit','Modifier le stock du cabinet'],['labo_gerer','Créer et suivre les travaux du laboratoire, gérer son stock'],['caisse_edit','Corriger ses encaissements du jour (sans voir les totaux)'],['compta_edit','Comptabilité : ajouter et modifier factures, paiements, assurances et fournisseurs']];
 const PERMS=[...MODULES,...ACTIONS];
-const DEF_ON=['mod_groupes','mod_checklists','mod_stock','mod_pointage','mod_reglement'];
+const DEF_ON=['mod_groupes','mod_checklists','mod_stock','mod_pointage','mod_reglement','mod_taches','mod_notes'];
 const PRESETS={dentiste:['rdv_voir','rdv_gerer','rdv_suppr','pat_voir','pat_edit','pat_docs','stock_edit','labo_voir','labo_gerer'],assistante:['rdv_jour','stock_edit'],
  secretaire:['rdv_voir','rdv_gerer','pat_voir','pat_edit','caisse','caisse_edit'],prothesiste:['pat_voir','labo_voir','labo_gerer'],stagiaire:['rdv_voir','pat_voir'],autre:[]};
 const presetPerms=r=>{const o={};PERMS.forEach(([k])=>o[k]=(PRESETS[r]||[]).includes(k)||DEF_ON.includes(k));return o};
@@ -570,7 +577,8 @@ const memberOf=u=>S.membres[u]||null;
 const statutOf=u=>memberOf(u)?.statut||'attente';
 const rawPerm=p=>{if(S.isOwner)return true;const m=memberOf(meUid());if(!m||m.statut!=='actif')return false;const v=m.perms?.[p];return v===undefined?DEF_ON.includes(p):!!v};
 /* Hors du cabinet (GPS), seuls les groupes de discussion restent accessibles. Le compte du Docteur n'est jamais limité. */
-const siteLock=()=>S.demo?S.demoSite==='out':(!S.isOwner&&S.cfg?.cabinet?.lat!=null&&S.site!=='in');
+const inHours=()=>{const sl=slotsOf(today());if(!sl.length)return false;const n=minOf(Date.now());return n>=toMin(sl[0][0])-30&&n<=toMin(sl[sl.length-1][1])+30};
+const siteLock=()=>S.demo?S.demoSite==='out':(!S.isOwner&&((S.cfg?.cabinet?.lat!=null&&S.site!=='in')||!inHours()));
 const perm=p=>rawPerm(p)&&(p==='mod_groupes'||!siteLock());
 const myGroups=()=>{if(S.isOwner)return groups();const g=memberOf(meUid())?.groupes;return Array.isArray(g)?groups().filter(x=>g.includes(x.id)):groups()};
 const roleOf=u=>(u===S.uid&&S.isOwner)?'dentiste':(memberOf(u)?.role||'');
@@ -647,6 +655,8 @@ const NAV=[
  {id:'caisse',lbl:'Caisse',ic:'cash',show:canCaisse,short:'Caisse'},
  {id:'pointage',lbl:'Pointage',ic:'clock',short:'Pointage',show:()=>perm('mod_pointage')},
  {id:'reglement',lbl:'Règlement intérieur',ic:'book',short:'Règlement',show:()=>perm('mod_reglement')},
+ {id:'taches',lbl:'Tâches',ic:'check',short:'Tâches',show:()=>perm('mod_taches')},
+ {id:'notes',lbl:'Bloc-notes',ic:'edit',short:'Notes',show:()=>perm('mod_notes')},
  {id:'compta',lbl:'Comptabilité',ic:'cash',short:'Compta',show:()=>perm('compta_voir')},
  {id:'rapports',lbl:'Rapports',ic:'chart',short:'Rapports',show:()=>S.isOwner},
  {id:'equipe',lbl:()=>S.isOwner?'Équipe & accès':'Mon profil',ic:()=>S.isOwner?'shield':'users',short:()=>S.isOwner?'Accès':'Profil'}
@@ -709,7 +719,7 @@ async function pointer(){
  const cab=S.cfg.cabinet;let loc=null;
  if(cab?.lat!=null&&!S.isOwner){toast('Vérification de votre position…');let c;try{c=await getPos()}catch(e){toast(geoErr(e),'err');return}
   const d=Math.round(distM(cab,{lat:c.latitude,lng:c.longitude})),acc=Math.round(c.accuracy||0),R=Number(cab.rayon)||10;
-  if(d-Math.min(acc,SITE_TOL)>R){toast(`Pointage impossible : vous êtes à ${d>=1000?(d/1000).toFixed(1)+' km':d+' m'} du cabinet. Le pointage se fait uniquement au cabinet.`,'err');return}
+  if(d-Math.min(acc,SITE_TOL)>R){toast('Pointage indisponible pour le moment.','err');return}
   loc={d,acc}}
  {const sl=slotsOf(today()),n=minOf(Date.now());const ok=sl.length&&n>=toMin(sl[0][0])-60&&n<=toMin(sl[sl.length-1][1])+60;
   if(!ok&&!await ask(sl.length?`Vous êtes en dehors des horaires du jour (${slotsTxt(sl)}). Pointer quand même ?`:'Aujourd\'hui est un jour de repos. Pointer quand même ?','Pointer'))return;if(!ok)loc={...(loc||{}),hors:true}}
@@ -747,6 +757,7 @@ Views.accueil={update(el){
   <div class="lit-st">${st.sessions.length?(st.inside?`Arrivée à ${hm(st.first)}. Temps de présence aujourd'hui : ${dur(st.total)}.`:`Départ à ${hm(st.last.out)}. Temps de présence aujourd'hui : ${dur(st.total)}.`):'Vous n\'avez pas encore pointé aujourd\'hui.'}</div>
   <button class="btn big" data-act="pointer">${ic('clock')}${st.inside?'Pointer le départ':'Pointer l\'arrivée'}</button>
  </section>`:''}
+ ${tachesCard()}
  ${installCard()}
  ${notifCard()}
  <nav class="tiles" aria-label="Modules" style="--cols:${mods.length%4===0?4:mods.length%5===0?5:mods.length%3===0?3:4};--colsd:${mods.length}">${mods.map(n=>{const u=n.id==='groupes'?totalUnread():0;const sh=typeof n.short==='function'?n.short():n.short;
@@ -777,17 +788,32 @@ Views.accueil={update(el){
  ${perm('mod_groupes')&&myGroups().length?`<section class="card"><div class="card-h"><h3>Groupes</h3></div><div class="list">${myGroups().map(g=>{const n=unreadOf(g.id);const last=S.latest.find(m=>m.groupe===g.id);return `<div class="li" style="cursor:pointer" data-act="openGroup" data-id="${esc(g.id)}"><div class="gicon">${esc(g.nom[0]||'G')}</div><div class="grow"><div class="t">${esc(g.nom)}</div><div class="s">${last?esc(nameOf(last.by)+' : '+(last.type==='image'?'Photo':last.type==='audio'?'Message vocal':(last.texte||'')).slice(0,70)):esc(g.desc||'')}</div></div>${n?`<span class="pill acc">${n} nouveau${n>1?'x':''}</span>`:''}</div>`}).join('')}</div></section>`:''}
  </div>`;
 }};
+/* ---- Pas de zoom de page ; zoom uniquement dans la visionneuse de photos ---- */
+['gesturestart','gesturechange','gestureend'].forEach(ev=>document.addEventListener(ev,e=>{if(!e.target.closest?.('.pv'))e.preventDefault()},{passive:false}));
+document.addEventListener('touchmove',e=>{if(e.touches.length>1&&!e.target.closest?.('.pv'))e.preventDefault()},{passive:false});
+let lastTap=0;document.addEventListener('touchend',e=>{if(e.target.closest?.('.pv,input,textarea,select'))return;const n=Date.now();if(n-lastTap<300)e.preventDefault();lastTap=n},{passive:false});
+function photoView(src,alt){const v=document.createElement('div');v.className='pv';v.innerHTML=`<button class="pvx" aria-label="Fermer">×</button><img src="${esc(src)}" alt="${esc(alt||'Photo')}"><div class="pvh">Pincez pour zoomer · double-touchez pour agrandir</div>`;(document.querySelector('dialog[open]')||document.body).appendChild(v);
+ const img=v.querySelector('img');let sc=1,tx=0,ty=0,st=null;const apply=()=>{img.style.transform=`translate(${tx}px,${ty}px) scale(${sc})`};
+ const rect=()=>img.getBoundingClientRect();const close=()=>v.remove();v.querySelector('.pvx').onclick=close;
+ const zoomAt=(ns,cx,cy)=>{ns=Math.max(1,Math.min(6,ns));const r0=img.offsetLeft,t0=img.offsetTop;const ox=cx-r0,oy=cy-t0;tx=ox-(ox-tx)*ns/sc;ty=oy-(oy-ty)*ns/sc;sc=ns;if(sc===1){tx=0;ty=0}apply()};
+ let lt=0;v.addEventListener('touchstart',e=>{if(e.touches.length===2){const[a,b]=e.touches;st={d:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),s:sc,cx:(a.clientX+b.clientX)/2,cy:(a.clientY+b.clientY)/2}}
+  else if(e.touches.length===1){const t=e.touches[0];const n=Date.now();if(n-lt<300){zoomAt(sc>1?1:2.5,t.clientX,t.clientY);lt=0;st=null;return}lt=n;st={px:t.clientX,py:t.clientY,tx,ty}}},{passive:true});
+ v.addEventListener('touchmove',e=>{e.preventDefault();if(!st)return;if(e.touches.length===2&&st.d){const[a,b]=e.touches;const d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);zoomAt(st.s*d/st.d,st.cx,st.cy)}
+  else if(e.touches.length===1&&st.px!=null&&sc>1){const t=e.touches[0];tx=st.tx+(t.clientX-st.px);ty=st.ty+(t.clientY-st.py);apply()}},{passive:false});
+ v.addEventListener('touchend',e=>{if(e.touches.length===0)st=null});
+ v.addEventListener('wheel',e=>{e.preventDefault();zoomAt(sc*(e.deltaY<0?1.15:1/1.15),e.clientX,e.clientY)},{passive:false});
+ v.addEventListener('click',e=>{if(e.target===v)close()});document.addEventListener('keydown',function k(e){if(e.key==='Escape'){close();document.removeEventListener('keydown',k)}})}
 /* ---- Présence au cabinet (GPS) ---- */
 const SITE_TOL=30;
 function demoBanner(){return `<div class="banner info demo-bar">${ic('users')}<div style="flex:1"><b>Mode démo : ${esc(nameOf(S.demo))}</b><div class="small">${esc(ROLES[memberOf(S.demo)?.role]||'')} — vous voyez exactement ce que voit ce membre. Rien n'est enregistré.</div></div>
  <button class="btn ghost" data-act="demoSite">${S.demoSite==='out'?'Simuler : au cabinet':'Simuler : hors cabinet'}</button><button class="btn pri" data-act="demoExit">Quitter la démo</button></div>`}
 function demoStart(u){if(!S._owner)return;S.demo=u;S.demoSite='in';$('#dlg')?.open&&$('#dlg').close();restartData();renderNav();go('accueil');toast('Démo : '+nameOf(u))}
 function demoExit(){S.demo=null;restartData();renderNav();go('equipe')}
-function siteBanner(){const st=S.site||'checking',c=S.siteInfo||{};
- const why=st==='checking'?'Vérification de votre position…':st==='nogps'?(c.msg||'La localisation est désactivée ou indisponible sur cet appareil.'):`Vous êtes à ${c.d>=1000?(c.d/1000).toFixed(1)+' km':Math.round(c.d||0)+' m'} du cabinet.`;
- return `<div class="banner warn site-lock">${ic('lock')}<div style="flex:1"><b>Fonctionnalités disponibles uniquement au cabinet.</b><div class="small">${esc(why)} Hors du cabinet, seuls les groupes de discussion restent accessibles.</div></div>${st==='checking'?'':`<button class="btn ghost" data-act="siteRetry">Réessayer</button>`}</div>`}
+function siteBanner(){return `<div class="banner warn site-lock">${ic('lock')}<div style="flex:1"><b>Les fonctionnalités de l'application sont temporairement désactivées.</b></div>${S.site&&S.site!=='checking'&&S.site!=='in'?`<button class="btn ghost" data-act="siteRetry">Réessayer</button>`:''}</div>`}
+function applyLock(){if(S.dataStarted)restartData();renderNav();if(!allowedView(S.view))go('accueil');else{const m=$('#main');if(m&&Views[S.view]){m.innerHTML='';Views[S.view].mount?.(m);Views[S.view].update?.(m)}}}
 function setSite(st,info){const before=siteLock();S.site=st;S.siteInfo=info||{};if(st==='in')ls.set('ns_site_in',Date.now());
- const after=siteLock();if(before!==after){if(S.dataStarted)restartData();renderNav();if(!allowedView(S.view))go('accueil');else{const m=$('#main');if(m&&Views[S.view]){m.innerHTML='';Views[S.view].mount?.(m);Views[S.view].update?.(m)}}}else if(S.view==='accueil'||!after)refresh()}
+ const after=siteLock();S.lockPrev=after;if(before!==after)applyLock();else if(S.view==='accueil'||!after)refresh()}
+setInterval(()=>{if(!S.dataStarted)return;const l=siteLock();if(S.lockPrev!==undefined&&l!==S.lockPrev)applyLock();S.lockPrev=l},30000);
 function sitePos(p){const c=p.coords||p;const cab=S.cfg?.cabinet;if(!cab||cab.lat==null)return;const d=distM(cab,{lat:c.latitude,lng:c.longitude}),acc=c.accuracy||0,R=Number(cab.rayon)||10;
  const eff=d-Math.min(acc,SITE_TOL);const ins=S.site==='in'?eff<=R+15:eff<=R;setSite(ins?'in':'out',{d,acc})}
 let siteWatch=null;
@@ -825,7 +851,7 @@ Views.agenda={
   const LG=$('#agLegend');if(LG)LG.innerHTML=soinLegend();
   $('#agList').innerHTML=list.length?list.map(r=>`<div data-lp="${esc(r.id)}" style="--tc:${esc(soinOf(r)?.c||'transparent')}" class="rdv ${['annule','absent'].includes(r.statut)?'dim':''}">
     <div class="h">${esc(r.heure||'--:--')}<small>${esc(r.duree||30)} min</small></div>
-    <div class="grow" data-act="${dayOnly()?'rdvMenu':'rdvEdit'}" data-id="${esc(r.id)}"><div style="font-weight:600">${esc(r.patient||'Patient')}${soinTag(r)}</div><div class="small muted">${esc([r.acte,r.praticien,r.tel].filter(Boolean).join(' · '))}</div>${r.soins?.texte?`<div class="small"><b>Soins :</b> ${esc(r.soins.texte)}</div>`:''}${r.note?`<div class="small muted">${esc(r.note)}</div>`:''}</div>
+    <div class="grow" data-act="${dayOnly()?'rdvMenu':'rdvEdit'}" data-id="${esc(r.id)}"><div style="font-weight:600">${esc(r.patient||'Patient')}${soinTag(r)}</div><div class="small muted">${esc([r.acte,r.praticien,r.tel].filter(Boolean).join(' · '))}</div>${r.soins?.texte?`<div class="small"><b>Soins :</b> ${esc(r.soins.texte)}</div>`:''}${(r.pec||[]).length?`<div class="small muted">Pris en charge : ${esc(r.pec.map(x=>nameOf(x.by)+' '+hm(x.ts)).join(', '))}</div>`:''}${r.note?`<div class="small muted">${esc(r.note)}</div>`:''}</div>
     <div class="rdv-side">${r.patientId&&perm('pat_voir')?`<button class="ib" data-act="openPat" data-id="${esc(r.patientId)}" aria-label="Ouvrir la fiche patient" title="Fiche patient">${ic('folder')}</button>`:''}<select class="sel-pill" aria-label="Statut" data-rdvstat="${esc(r.id)}" ${perm('rdv_gerer')||perm('rdv_jour')?'':'disabled'}>${Object.entries(STATUTS).map(([k,v])=>`<option value="${k}" ${r.statut===k?'selected':''}>${esc(v)}</option>`).join('')}</select></div>
    </div>`).join(''):`<div class="empty"><strong>Aucun rendez-vous ce jour</strong>${perm('rdv_gerer')?'Ajoutez le premier avec le bouton « Rendez-vous ».':''}</div>`;
   $$('[data-rdvstat]').forEach(s=>s.onchange=()=>W(()=>S.db.doc('rdv/'+s.dataset.rdvstat).update({statut:s.value,maj:Date.now(),par:S.uid}),'Statut : '+STATUTS[s.value]));
@@ -842,10 +868,11 @@ Views.agenda={
 async function rdvPatientId(r){if(r.patientId)return r.patientId;if(!perm('pat_edit')){toast('Ce rendez-vous n\'est lié à aucune fiche patient. Demandez à l\'accueil de créer la fiche.','err');return null}
  try{const pt=await findOrCreatePatient({full:r.patient,tel:r.tel});if(!pt)return null;if(perm('rdv_gerer'))await S.db.doc('rdv/'+r.id).update({patientId:pt.id,patient:pt.nom||r.patient});r.patientId=pt.id;return pt.id}catch(e){console.warn(e);toast(errMsg(e),'err');return null}}
 function rdvMenu(id){const r=S.rdvSel.find(x=>x.id===id);if(!r)return;const docs=(perm('pat_docs')||perm('rdv_jour'))&&!!S.assets,g=perm('rdv_gerer')||perm('rdv_jour');
- const items=[docs&&['photo','img','Ajouter des photos'],docs&&['radio','tooth','Ajouter une radio'],g&&['soins','check','Soins de la séance'],g&&['note','edit','Écrire une note'],r.patientId&&perm('pat_voir')&&['fiche','folder','Ouvrir la fiche patient'],perm('rdv_gerer')&&['rdv','cal','Modifier le rendez-vous']].filter(Boolean);
+ const items=[g&&['pec','users',(r.pec||[]).some(x=>x.by===S.uid)?'Prise en charge (déjà enregistrée)':'Prendre en charge ce patient'],docs&&['photo','img','Ajouter des photos'],docs&&['radio','tooth','Ajouter une radio'],g&&['soins','check','Soins de la séance'],g&&['note','edit','Écrire une note'],r.patientId&&perm('pat_voir')&&['fiche','folder','Ouvrir la fiche patient'],perm('rdv_gerer')&&['rdv','cal','Modifier le rendez-vous']].filter(Boolean);
  const d=openModal({title:r.patient||'Patient',ok:null,cancel:'Fermer',body:`<div class="small muted" style="margin-top:-6px">${esc([r.heure,r.acte].filter(Boolean).join(' · '))}</div><div class="menu-list">${items.map(([k,i,l])=>`<button type="button" class="menu-it" data-k="${k}">${ic(i)}<span>${esc(l)}</span>${ic('right')}</button>`).join('')}</div>`});
  d.querySelector('.menu-list').onclick=async e=>{const b=e.target.closest('[data-k]');if(!b)return;const k=b.dataset.k;
   if(k==='photo'||k==='radio'){const pid=await rdvPatientId(r);if(!pid)return;d.close();S.upPid=pid;S.upType=k;const i=$('#patfile');i.accept='image/*';i.multiple=k==='photo';i.click()}
+  else if(k==='pec'){d.close();if((r.pec||[]).some(x=>x.by===S.uid)){toast('Déjà pris en charge par vous.');return}const data={pec:firebase.firestore.FieldValue.arrayUnion({by:S.uid,ts:Date.now()}),maj:Date.now(),par:S.uid};if(['prevu','confirme','arrive'].includes(r.statut||'prevu'))data.statut='encours';W(()=>S.db.doc('rdv/'+r.id).update(data),'Patient pris en charge')}
   else if(k==='soins'){d.close();rdvSoins(r)}else if(k==='note'){d.close();rdvNote(r)}else if(k==='fiche'){d.close();openPatient(r.patientId)}else if(k==='rdv'){d.close();rdvModal(r)}}}
 function rdvSoins(r){const so=r.soins||{};openModal({title:'Soins de la séance',body:`<div class="small muted">${esc(r.patient||'')}, ${esc(fmtDate(r.date,{weekday:'long',day:'numeric',month:'long'}))}</div>
   <label class="f">Soins réalisés<textarea class="inp" name="texte" id="so-t" rows="4" placeholder="Ex. : Traitement endodontique 36, obturation canalaire" required>${esc(so.texte||'')}</textarea></label>
@@ -1065,6 +1092,8 @@ function histHTML(){const h=(S.patHist?.soins||[]).map(hS);if(!h.length)return '
  return `<section class="card"><div class="card-h"><h3>Historique des soins</h3><span class="sp"></span><span class="small muted">${h.length} acte${h.length>1?'s':''}</span></div>
  <div class="tablewrap"><table><thead><tr><th>Date</th><th>Dent</th><th>Acte</th></tr></thead><tbody>${(more?L.slice(0,12):L).map(x=>`<tr><td class="num" style="white-space:nowrap">${esc(x.d?fmtDate(x.d,{day:'2-digit',month:'2-digit',year:'numeric'}):'')}</td><td>${esc(x.dent)}</td><td>${esc(x.acte)}${x.c?`<div class="small muted">${esc(x.c)}</div>`:''}</td></tr>`).join('')}</tbody></table></div>
  ${more?`<button class="btn ghost" data-act="histAll" style="margin-top:8px">Afficher tout l'historique</button>`:''}</section>`}
+function pecHTML(){const L=[];(S.patRdv||[]).forEach(r=>(r.pec||[]).forEach(x=>L.push({...x,date:r.date,acte:soinOf(r)?.nom||r.acte||''})));if(!L.length)return '';L.sort((a,b)=>b.ts-a.ts);
+ return `<section class="card"><div class="card-h"><h3>Prises en charge par l'équipe</h3><span class="sp"></span><span class="small muted">${L.length}</span></div><div class="list">${L.slice(0,30).map(x=>`<div class="li"><div class="grow"><div class="t">${esc(nameOf(x.by))}</div><div class="s">${esc(capFirst(fmtDate(x.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})))} à ${hm(x.ts)}${x.acte?' · '+esc(x.acte):''}</div></div></div>`).join('')}</div></section>`}
 function finHTML(){const CA=(S.patCaisse||[]).map(x=>({d:x.date,m:Number(x.montant)||0,mode:x.mode,obs:'Caisse'+(x.acte?' · '+x.acte:'')+' · '+nameOf(x.uid)}));if(!S.isOwner||(!S.patFin&&!CA.length))return '';const f=S.patFin||{};const A=(f.actes||[]).map(hA),P=[...(f.paiements||[]).map(hP),...CA].sort((a,b)=>(a.d||'').localeCompare(b.d||''));
  const th=A.reduce((t,a)=>t+(a.prix-a.remise),0),tp=P.reduce((t,x)=>t+x.m,0),r=th-tp;const MO={especes:'Espèces',carte:'Carte',cheque:'Chèque',virement:'Virement'};
  return `<section class="card stack" style="gap:12px"><div class="card-h"><h3>Honoraires et paiements</h3><span class="sp"></span><span class="pill acc">${ic('lock')}Visible par vous seul</span></div>
@@ -1137,8 +1166,8 @@ function updatePatient(){const p=S.patDoc;const H=$('#patHead'),B=$('#patBody');
    :`<div class="empty"><strong>Aucun fichier</strong>${up?'Ajoutez une radio panoramique, une rétro-alvéolaire, un cône beam en capture ou des photos cliniques.':perm('pat_docs')?'L\'ajout de fichiers demande un accès Éditeur à la page.':''}</div>`}
  </section>
  ${perm('labo_voir')&&S.labo.some(c=>c.patientId===p.id)?`<section class="card"><div class="card-h"><h3>Laboratoire</h3></div><div class="list">${S.labo.filter(c=>c.patientId===p.id).map(c=>`<div class="li" style="cursor:pointer" data-act="labOpen" data-id="${esc(c.id)}"><div class="grow"><div class="t">${esc(c.travail||'Travail')}${c.dents?', dent '+esc(c.dents):''}</div><div class="s">${esc(LAB[c.section]?.nom||'')}, ${esc(LAB[c.section]?.steps[labStepIdx(c)]?.[1]||'')}</div></div>${labDue(c)}</div>`).join('')}</div></section>`:''}
- ${finHTML()}${histHTML()}
- <section class="card"><div class="card-h"><h3>Rendez-vous</h3><span class="sp"></span>${rdvs.length?`<span class="small muted">${rdvs.length}</span>`:''}</div>${rdvs.length?`<div class="list">${(S.rdvAll?rdvs:rdvs.slice(0,15)).map(r=>`<div class="li" style="cursor:pointer" data-act="patRdvOpen" data-id="${esc(r.id)}"><div class="grow"><div class="t">${esc(capFirst(fmtDate(r.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})))}, ${esc(r.heure||'')}</div><div class="s">${esc(r.acte||'')}</div>${r.soins?.texte?`<div class="s" style="color:var(--fg)"><b>Soins :</b> ${esc(r.soins.texte)}${r.soins.dents?' (dent '+esc(r.soins.dents)+')':''}</div>`:''}${r.note?`<div class="s">Note : ${esc(r.note)}</div>`:''}</div><span class="pill ${STATUT_CLS[r.statut]||''}">${esc(STATUTS[r.statut]||'Prévu')}</span></div>`).join('')}</div>${rdvs.length>15&&!S.rdvAll?`<button class="btn ghost" data-act="rdvAll" style="margin-top:8px">Afficher les ${rdvs.length} rendez-vous</button>`:''}`:'<div class="small muted">Aucun rendez-vous lié à ce dossier.</div>'}</section>`}
+ ${pecHTML()}${finHTML()}${histHTML()}
+ <section class="card"><div class="card-h"><h3>Rendez-vous</h3><span class="sp"></span>${rdvs.length?`<span class="small muted">${rdvs.length}</span>`:''}</div>${rdvs.length?`<div class="list">${(S.rdvAll?rdvs:rdvs.slice(0,15)).map(r=>`<div class="li" style="cursor:pointer" data-act="patRdvOpen" data-id="${esc(r.id)}"><div class="grow"><div class="t">${esc(capFirst(fmtDate(r.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})))}, ${esc(r.heure||'')}</div><div class="s">${esc(r.acte||'')}</div>${r.soins?.texte?`<div class="s" style="color:var(--fg)"><b>Soins :</b> ${esc(r.soins.texte)}${r.soins.dents?' (dent '+esc(r.soins.dents)+')':''}</div>`:''}${(r.pec||[]).length?`<div class="s">Pris en charge par ${esc(r.pec.map(x=>nameOf(x.by)+' ('+hm(x.ts)+')').join(', '))}</div>`:''}${r.note?`<div class="s">Note : ${esc(r.note)}</div>`:''}</div><span class="pill ${STATUT_CLS[r.statut]||''}">${esc(STATUTS[r.statut]||'Prévu')}</span></div>`).join('')}</div>${rdvs.length>15&&!S.rdvAll?`<button class="btn ghost" data-act="rdvAll" style="margin-top:8px">Afficher les ${rdvs.length} rendez-vous</button>`:''}`:'<div class="small muted">Aucun rendez-vous lié à ce dossier.</div>'}</section>`}
 function patModal(p){p=p||{};
  openModal({title:p.id?'Modifier la fiche':'Nouveau patient',del:p.id&&perm('pat_suppr')?'Supprimer le dossier':null,
  body:`<div class="fgrid"><label class="f">Nom<input class="inp" name="nom" id="pt-nom" required value="${esc(p.nom||'')}" autocomplete="off"></label><label class="f">Prénom<input class="inp" name="prenom" id="pt-prenom" value="${esc(p.prenom||'')}" autocomplete="off"></label></div>
@@ -1176,7 +1205,7 @@ $('#patfile').addEventListener('change',e=>{const files=[...e.target.files];e.ta
   thumbs.forEach(u=>URL.revokeObjectURL(u));W(()=>S.db.doc('patients/'+pid).update({maj:Date.now()}));toast(files.length>1?`${files.length} fichiers ajoutés`:'Fichier ajouté');return true}})});
 async function patView(id){const d=S.patDocs.find(x=>x.id===id);if(!d)return;const src=await blobReady(d.asset);
  openModal({title:d.titre||DTYPES[d.type]||'Fichier',ok:null,cancel:'Fermer',del:perm('pat_suppr')?'Supprimer':null,
- body:`<div class="viewer">${d.mime==='application/pdf'?`<div class="empty"><strong>Document PDF</strong></div>`:`<img src="${esc(src)}" alt="${esc(d.titre||'')}">`}</div>
+ body:`<div class="viewer">${d.mime==='application/pdf'?`<div class="empty"><strong>Document PDF</strong></div>`:`<img src="${esc(src)}" alt="${esc(d.titre||'')}" data-act="zoom" style="cursor:zoom-in">`}</div><div class="small muted">Touchez l'image pour l'agrandir.</div>
  <div class="small muted">${esc(DTYPES[d.type]||'')}, ${esc(fmtDate(d.date||today(),{day:'numeric',month:'long',year:'numeric'}))}${d.dents?', dent '+esc(d.dents):''}. Ajouté par ${esc(nameOf(d.by))}.</div>`,
  onDel:async()=>{if(!await ask('Supprimer ce fichier du dossier ?','Supprimer'))return false;const ok=await W(()=>S.db.doc(`patients/${S.patient}/docs/${d.id}`).delete(),'Fichier supprimé');if(ok&&S.assets){try{await S.assets.delete(d.asset)}catch(e){}}return ok}})}
 
@@ -1666,7 +1695,7 @@ function pickFiles(accept,multiple){return new Promise(res=>{const i=document.cr
  i.onchange=()=>{res([...i.files]);i.remove()};document.body.appendChild(i);i.click()})}
 async function uploadFiles(files){const out=[];let n=0;for(const f of files){n++;toast(`Envoi ${n} sur ${files.length}…`);
  try{if(f.type==='application/pdf'){const up=await S.assets.upload(f,{type:'application/pdf'});out.push({url:up.id,pdf:true})}else{const b=await compressImg(f,2200,.86);const up=await S.assets.upload(b,{type:'image/jpeg'});out.push({url:up.id})}}catch(e){console.warn(e);toast(errMsg(e),'err')}}return out}
-const thumbsHTML=(L,k)=>(L||[]).map((x,i)=>`<span class="cthumb">${x.pdf?`<a href="${esc(x.url)}" target="_blank" rel="noopener" class="pdfchip">PDF</a>`:`<a href="${esc(x.url)}" target="_blank" rel="noopener"><img src="${esc(x.url)}" alt=""></a>`}${k?`<button type="button" class="x" data-rm="${k}" data-i="${i}" aria-label="Retirer">×</button>`:''}</span>`).join('');
+const thumbsHTML=(L,k)=>(L||[]).map((x,i)=>`<span class="cthumb">${x.pdf?`<a href="${esc(x.url)}" target="_blank" rel="noopener" class="pdfchip">PDF</a>`:`<img src="${esc(x.url)}" alt="Pièce jointe" data-act="zoom" style="cursor:zoom-in">`}${k?`<button type="button" class="x" data-rm="${k}" data-i="${i}" aria-label="Retirer">×</button>`:''}</span>`).join('');
 
 Views.compta={
  mount(el){const t=S.cTab||'factures';const can=perm('compta_edit');
@@ -1678,28 +1707,35 @@ Views.compta={
  update(){const B=$('#cBody');if(!B)return;const t=S.cTab||'factures';if(t==='factures')factView(B);else if(t==='assurances')assView(B);else fourView(B)}};
 
 /* Factures */
-function factView(B){const F=S.cF||{from:today().slice(0,7)+'-01',to:today(),four:'',st:'tout'};S.cF=F;
- const L=(S.factures||[]).filter(f=>(!F.from||f.date>=F.from)&&(!F.to||f.date<=F.to)&&(!F.four||f.four===F.four)&&(F.st==='tout'||(F.st==='impaye'?factReste(f)>0:factReste(f)<=0)));
- const tot=L.reduce((t,f)=>t+(Number(f.montant)||0),0),pay=L.reduce((t,f)=>t+factPaye(f),0);
- B.innerHTML=`<section class="card stack" style="gap:10px"><div class="fgrid"><label class="f">Du<input class="inp" type="date" id="cf-from" value="${esc(F.from)}"></label><label class="f">Au<input class="inp" type="date" id="cf-to" value="${esc(F.to)}"></label></div>
+const factYear=f=>String(f.annee||String(f.date||'').slice(0,4));
+function factView(B){const F=S.cF||{annee:today().slice(0,4),four:'',st:'tout'};if(!F.annee)F.annee=today().slice(0,4);S.cF=F;
+ const years=[...new Set([today().slice(0,4),...(S.factures||[]).map(factYear)])].filter(Boolean).sort().reverse();
+ const L=(S.factures||[]).filter(f=>factYear(f)===F.annee&&(!F.four||f.four===F.four)&&(F.st==='tout'||(F.st==='impaye'?factReste(f)>0:factReste(f)<=0)));
+ const tot=L.reduce((t,f)=>t+(Number(f.montant)||0),0),pay=L.reduce((t,f)=>t+factPaye(f),0);const Z=S.zipState?.[F.annee];
+ B.innerHTML=`<section class="card stack" style="gap:10px"><div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><b>Année</b><div class="chips">${years.map(y=>`<button class="chip" aria-pressed="${F.annee===y}" data-act="factYear" data-y="${y}">${y}</button>`).join('')}</div></div>
   <div class="fgrid"><label class="f">Fournisseur<select class="inp" id="cf-four"><option value="">Tous</option>${fourList().map(x=>`<option value="${esc(x.id)}" ${F.four===x.id?'selected':''}>${esc(x.nom)}</option>`).join('')}</select></label>
-  <label class="f">Statut<select class="inp" id="cf-st">${[['tout','Toutes'],['impaye','Non soldées'],['paye','Soldées']].map(([k,l])=>`<option value="${k}" ${F.st===k?'selected':''}>${l}</option>`).join('')}</select></label></div></section>
- <div class="mini-kpis card"><div class="kpi"><b>${MAD0(tot)}</b><span class="small muted">${L.length} facture(s)</span></div><div class="kpi"><b>${MAD0(pay)}</b><span class="small muted">payé</span></div><div class="kpi"><b style="color:${tot-pay>0.5?'var(--bad)':'var(--ok)'}">${MAD0(tot-pay)}</b><span class="small muted">reste à payer</span></div></div>
+  <label class="f">Statut<select class="inp" id="cf-st">${[['tout','Toutes'],['impaye','Non soldées'],['paye','Soldées']].map(([k,l])=>`<option value="${k}" ${F.st===k?'selected':''}>${l}</option>`).join('')}</select></label></div>
+  <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center"><button class="btn ghost" data-act="factZip" ${Z?.statut==='en_cours'?'disabled':''}>${ic('box')}${Z?.statut==='en_cours'?'Préparation du ZIP…':'Télécharger les factures '+esc(F.annee)+' (ZIP)'}</button>${Z?.statut==='pret'&&Z.url?`<a class="btn pri" href="${esc(Z.url)}" download="factures-${esc(F.annee)}.zip" target="_blank" rel="noopener">${ic('right')}Ouvrir le ZIP (${Z.factures} factures, ${Math.max(1,Math.round((Z.taille||0)/1048576))} Mo)</a>`:''}${Z?.statut==='erreur'?'<span class="small" style="color:var(--bad)">Échec de la préparation. Réessayez.</span>':''}</div></section>
+ <div class="mini-kpis card"><div class="kpi"><b>${MAD0(tot)}</b><span class="small muted">${L.length} facture(s) en ${esc(F.annee)}</span></div><div class="kpi"><b>${MAD0(pay)}</b><span class="small muted">payé</span></div><div class="kpi"><b style="color:${tot-pay>0.5?'var(--bad)':'var(--ok)'}">${MAD0(tot-pay)}</b><span class="small muted">reste à payer</span></div></div>
  <section class="card" style="padding-block:4px">${L.length?L.map(f=>{const r=factReste(f);return `<div class="li" style="cursor:pointer" data-act="factEdit" data-id="${esc(f.id)}"><div class="grow"><div class="t">${esc(fourName(f.four)||f.fourNom||'Fournisseur')}${f.num?` <span class="small muted">n° ${esc(f.num)}</span>`:''}</div>
-  <div class="s">${esc(fmtDate(f.date,{day:'numeric',month:'short',year:'numeric'}))} · ${esc(f.cat||'')}${(f.photos||[]).length?' · '+f.photos.length+' photo(s)':''}${(f.paiements||[]).length?' · '+f.paiements.length+' paiement(s)':''}</div></div>
-  <div style="text-align:right"><b class="num">${MAD0(f.montant)}</b><div>${r>0.5?`<span class="pill bad">reste ${MAD0(r)}</span>`:'<span class="pill ok">soldée</span>'}</div></div></div>`}).join(''):'<div class="empty"><strong>Aucune facture sur cette période</strong>Ajoutez une facture avec le bouton « Facture » : photo de la facture, fournisseur, montant et paiements.</div>'}</section>`;
- const up=()=>{S.cF={from:$('#cf-from').value,to:$('#cf-to').value,four:$('#cf-four').value,st:$('#cf-st').value};factView(B)};['#cf-from','#cf-to','#cf-four','#cf-st'].forEach(k=>$(k).onchange=up)}
+  <div class="s">${esc(fmtDate(f.date,{day:'numeric',month:'short',year:'numeric'}))} · ${esc(f.cat||'')}${(f.photos||[]).length?' · '+f.photos.length+' fichier(s)':' · <b style="color:var(--bad)">sans fichier</b>'}${(f.paiements||[]).length?' · '+f.paiements.length+' paiement(s)':''}</div></div>
+  <div style="text-align:right"><b class="num">${MAD0(f.montant)}</b><div>${r>0.5?`<span class="pill bad">reste ${MAD0(r)}</span>`:'<span class="pill ok">soldée</span>'}</div></div></div>`}).join(''):'<div class="empty"><strong>Aucune facture pour '+esc(F.annee)+'</strong>Ajoutez une facture avec le bouton « Facture » : photo ou PDF, fournisseur, année, montant et paiements.</div>'}</section>`;
+ const up=()=>{S.cF={...F,four:$('#cf-four').value,st:$('#cf-st').value};factView(B)};['#cf-four','#cf-st'].forEach(k=>$(k).onchange=up)}
+async function factZip(){const y=S.cF?.annee||today().slice(0,4);S.zipState=S.zipState||{};S.zipState[y]={statut:'en_cours'};Views.compta.update();
+ if(!await W(()=>S.db.collection('exportsDemande').add({annee:y,by:S.uid,ts:Date.now()}))){S.zipState[y]=null;Views.compta.update();return}
+ toast('Préparation du ZIP… (une à deux minutes)');S.subs.zip?.();S.subs.zip=S.db.doc('exports/factures-'+y).onSnapshot(s=>{const d=s.data();if(!d||d.ts<Date.now()-600000)return;S.zipState[y]=d;Views.compta.update();if(d.statut!=='en_cours'){S.subs.zip?.();S.subs.zip=null;if(d.statut==='pret')toast('ZIP prêt : touchez « Ouvrir le ZIP ».')}},e=>console.warn(e))}
 function factEdit(id){const f0=(S.factures||[]).find(x=>x.id===id)||{date:today(),montant:'',cat:'Consommables',photos:[],paiements:[]};const f=JSON.parse(JSON.stringify(f0));const ro=!perm('compta_edit');
  f.photos=f.photos||[];f.paiements=f.paiements||[];
  const d=openModal({title:f.id?'Facture':'Nouvelle facture',ok:ro?null:'Enregistrer',cancel:ro?'Fermer':'Annuler',del:f.id&&!ro?'Supprimer':null,
   body:`<fieldset class="fs" ${ro?'disabled':''}><div class="fgrid"><label class="f">Fournisseur<select class="inp" name="four" id="fa-four" required><option value="">— Choisir —</option>${fourList().map(x=>`<option value="${esc(x.id)}" ${f.four===x.id?'selected':''}>${esc(x.nom)}</option>`).join('')}<option value="__new">+ Nouveau fournisseur…</option></select></label>
   <label class="f">Catégorie<select class="inp" name="cat" id="fa-cat">${FACT_CATS.map(c=>`<option ${f.cat===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label></div>
-  <div class="fgrid"><label class="f">Date de la facture<input class="inp" type="date" name="date" id="fa-date" value="${esc(f.date)}" required></label><label class="f">N° de facture<input class="inp" name="num" id="fa-num" value="${esc(f.num||'')}"></label><label class="f">Montant (DH)<input class="inp num" type="number" step="0.01" min="0" name="montant" id="fa-mt" value="${esc(f.montant)}" required></label></div>
-  <div class="stack" style="gap:6px"><b>Photos de la facture</b><div class="cthumbs" id="fa-ph">${thumbsHTML(f.photos,ro?'':'ph')}</div>${ro?'':`<button type="button" class="btn ghost" id="fa-addph" style="align-self:flex-start">${ic('img')}Photographier ou joindre la facture</button>`}</div>
+  <div class="fgrid"><label class="f">Année de la facture<select class="inp" name="annee" id="fa-annee">${Array.from({length:8},(_,i)=>String(+today().slice(0,4)+1-i)).map(y=>`<option ${String(f.annee||String(f.date||today()).slice(0,4))===y?'selected':''}>${y}</option>`).join('')}</select></label><label class="f">Date de la facture<input class="inp" type="date" name="date" id="fa-date" value="${esc(f.date)}" required></label><label class="f">N° de facture<input class="inp" name="num" id="fa-num" value="${esc(f.num||'')}"></label><label class="f">Montant (DH)<input class="inp num" type="number" step="0.01" min="0" name="montant" id="fa-mt" value="${esc(f.montant)}" required></label></div>
+  <div class="stack" style="gap:6px"><b>Facture (photo ou PDF)</b><div class="cthumbs" id="fa-ph">${thumbsHTML(f.photos,ro?'':'ph')}</div>${ro?'':`<button type="button" class="btn ghost" id="fa-addph" style="align-self:flex-start">${ic('img')}Photo ou PDF de la facture</button>`}</div>
   <div class="stack" style="gap:8px"><b>Paiements</b><div id="fa-pays" class="stack" style="gap:6px"></div>${ro?'':`<button type="button" class="btn ghost" id="fa-addpay" style="align-self:flex-start">${ic('plus')}Ajouter un paiement</button>`}</div>
   <label class="f">Note<input class="inp" name="note" id="fa-note" value="${esc(f.note||'')}"></label></fieldset>`,
   onOk:async v=>{if(!v.four||v.four==='__new'){toast('Choisissez le fournisseur.','err');return false}const mt=Number(String(v.montant).replace(',','.'));if(!(mt>=0)||v.montant===''){toast('Indiquez le montant.','err');return false}
-   const data={four:v.four,fourNom:fourName(v.four),cat:v.cat,date:v.date,num:v.num.trim(),montant:mt,photos:f.photos,paiements:f.paiements.filter(p=>Number(p.montant)>0),note:v.note.trim(),maj:Date.now(),par:S.uid};
+   if(!f.photos.length&&!await ask('Aucune photo ni PDF de la facture. Enregistrer quand même ?','Enregistrer'))return false;
+   const data={four:v.four,fourNom:fourName(v.four),annee:v.annee||String(v.date).slice(0,4),cat:v.cat,date:v.date,num:v.num.trim(),montant:mt,photos:f.photos,paiements:f.paiements.filter(p=>Number(p.montant)>0),note:v.note.trim(),maj:Date.now(),par:S.uid};
    return f.id?W(()=>S.db.doc('factures/'+f.id).update(data),'Facture enregistrée'):W(()=>S.db.collection('factures').add({...data,cree:Date.now(),creePar:S.uid}),'Facture ajoutée')},
   onDel:async()=>{if(!await ask('Supprimer cette facture ?','Supprimer'))return false;return W(()=>S.db.doc('factures/'+f.id).delete(),'Facture supprimée')}});
  const drawPays=()=>{$('#fa-pays',d).innerHTML=f.paiements.length?f.paiements.map((p,i)=>`<div class="paycard"><div class="fgrid"><label class="f">Date<input class="inp" type="date" data-pi="${i}" data-k="date" value="${esc(p.date||'')}"></label><label class="f">Montant<input class="inp num" type="number" step="0.01" data-pi="${i}" data-k="montant" value="${esc(p.montant||'')}"></label>
@@ -1713,6 +1749,7 @@ function factEdit(id){const f0=(S.factures||[]).find(x=>x.id===id)||{date:today(
   const pd=e.target.closest('[data-paydel]');if(pd){f.paiements.splice(+pd.dataset.paydel,1);drawPays()}});
  if(!ro){$('#fa-addph',d).onclick=async()=>{if(!S.assets){toast('Envoi de fichiers indisponible.','err');return}const fs=await pickFiles('image/*,application/pdf',true);if(!fs.length)return;f.photos.push(...await uploadFiles(fs));$('#fa-ph',d).innerHTML=thumbsHTML(f.photos,'ph')};
   $('#fa-addpay',d).onclick=()=>{const reste=Math.max(0,(Number($('#fa-mt',d).value)||0)-factPaye(f));f.paiements.push({date:today(),montant:reste||'',mode:'virement',photos:[]});drawPays()};
+  $('#fa-date',d).onchange=e=>{if(e.target.value)$('#fa-annee',d).value=e.target.value.slice(0,4)};
   $('#fa-four',d).onchange=e=>{if(e.target.value==='__new'){e.target.value='';toast('Ajoutez d\'abord le fournisseur dans l\'onglet « Fournisseurs ».')}}}}
 
 /* Assurances */
@@ -1766,6 +1803,54 @@ function fourEdit(id){const x=S.four?.[id]||{type:'materiel'};
    return x.id?W(()=>S.db.doc('fournisseurs/'+x.id).update(data),'Fournisseur enregistré'):W(()=>S.db.collection('fournisseurs').add({...data,cree:Date.now()}),'Fournisseur ajouté')},
   onDel:async()=>{if(!await ask('Supprimer « '+x.nom+' » ? Ses factures restent enregistrées.','Supprimer'))return false;return W(()=>S.db.doc('fournisseurs/'+x.id).delete(),'Fournisseur supprimé')}})}
 
+/* ---- Tâches quotidiennes de l'équipe ---- */
+const DEF_TACHES=['Préparer les salles de soins','Stériliser et ranger les instruments','Vérifier le stock des consommables','Confirmer les rendez-vous du lendemain','Désinfecter les fauteuils entre les patients','Vider les déchets (DASRI)','Nettoyer la salle de stérilisation','Rappeler les patients absents','Mettre à jour les fiches patients','Clôturer la caisse','Vérifier les travaux du laboratoire','Commander les consommables manquants'].map((nom,i)=>({id:'t'+i,nom}));
+const tachesCfg=()=>({liste:S.cfg?.taches?.liste||DEF_TACHES,assign:S.cfg?.taches?.assign||{}});
+function mesTaches(uid,day){const C=tachesCfg();const ids=C.assign[uid]||[];const base=C.liste.filter(t=>ids.includes(t.id));return [...base,...(day?.extra||[])]}
+function tachesCard(){if(!perm('mod_taches'))return '';const L=mesTaches(meUid(),S.myTaches);if(!L.length)return '';const done=S.myTaches?.done||{};const n=L.filter(t=>done[t.id]).length;
+ return `<section class="card"><div class="card-h"><h3>Mes tâches du jour</h3><span class="sp"></span><span class="pill ${n===L.length?'ok':''}">${n}/${L.length}</span></div>
+ <div class="list">${L.map(t=>`<label class="li tache" style="cursor:pointer"><input type="checkbox" data-tache="${esc(t.id)}" ${done[t.id]?'checked':''}><div class="grow"><div class="t" style="${done[t.id]?'text-decoration:line-through;opacity:.6':''}">${esc(t.nom)}</div>${done[t.id]?`<div class="s">Fait à ${hm(done[t.id])}</div>`:''}</div></label>`).join('')}</div></section>`}
+document.addEventListener('change',e=>{const c=e.target.closest?.('[data-tache]');if(!c)return;const id=c.dataset.tache;
+ W(()=>S.db.doc(`taches/${S.uid}/j/${today()}`).set({date:today(),done:{[id]:c.checked?Date.now():firebase.firestore.FieldValue.delete()}},{merge:true}))});
+Views.taches={mount(el){const d=S.tDate||today();el.innerHTML=`<div class="stack"><div class="head"><div><div class="eyebrow">Équipe</div><h1>Tâches</h1></div><span class="sp"></span>${S.isOwner?`<button class="btn ghost" data-act="tachesEdit">${ic('edit')}Gérer les tâches</button>`:''}</div>${banners()}
+  ${S.isOwner?`<div class="row" style="gap:6px"><input class="inp" type="date" id="tDate" value="${esc(d)}" max="${today()}" style="width:auto"><button class="ib" data-act="tLoad" aria-label="Actualiser">${ic('refresh')}</button></div><div id="tTeam" class="stack"><div class="small muted">Chargement…</div></div>`:'<div id="tMine"></div>'}</div>`;
+  if(S.isOwner){$('#tDate').onchange=e=>{S.tDate=e.target.value||today();loadTachesTeam()};loadTachesTeam()}this.update()},
+ update(){const M=$('#tMine');if(M)M.innerHTML=tachesCard()||'<div class="card"><div class="empty"><strong>Aucune tâche attribuée</strong>Le Docteur n\'a pas encore défini vos tâches.</div></div>'}};
+async function loadTachesTeam(){const T=$('#tTeam');if(!T)return;const d=S.tDate||today();const C=tachesCfg();const U=teamMembers().filter(u=>u!==S.uid);
+ const rows=await Promise.all(U.map(async u=>{let day=null;try{const s=await S.db.doc(`taches/${u}/j/${d}`).get();day=s.exists?s.data():null}catch(e){}return{u,day,L:mesTaches(u,day)}}));
+ T.innerHTML=rows.filter(r=>r.L.length).map(r=>{const done=r.day?.done||{};const n=r.L.filter(t=>done[t.id]).length;
+  return `<section class="card"><div class="card-h"><h3>${esc(nameOf(r.u))}</h3><span class="sp"></span><span class="pill ${n===r.L.length?'ok':n?'warn':'bad'}">${n}/${r.L.length}</span><button class="ib" data-act="tacheAdd" data-u="${esc(r.u)}" aria-label="Ajouter une tâche ponctuelle" title="Tâche ponctuelle aujourd'hui">${ic('plus')}</button></div>
+  <div class="list">${r.L.map(t=>`<div class="li"><span class="pill ${done[t.id]?'ok':'bad'}">${done[t.id]?'✓':'✗'}</span><div class="grow"><div class="t">${esc(t.nom)}</div>${done[t.id]?`<div class="s">${hm(done[t.id])}</div>`:''}</div></div>`).join('')}</div></section>`}).join('')||'<div class="card"><div class="empty"><strong>Aucune tâche attribuée</strong>Utilisez « Gérer les tâches » pour définir la liste et l\'attribuer à chaque membre.</div></div>'}
+function tachesEdit(){if(!S.isOwner)return;const C=tachesCfg();const L=C.liste.map(t=>({...t}));const A=JSON.parse(JSON.stringify(C.assign));const U=teamMembers().filter(u=>u!==S.uid);
+ const draw=()=>`<div class="small muted">Liste des tâches possibles au cabinet, puis cochez celles de chaque membre. Elles se répètent chaque jour et apparaissent dans le rapport du soir.</div>
+  <div class="stack" style="gap:6px">${L.map((t,i)=>`<div class="row" style="gap:6px"><input class="inp" data-tn="${i}" value="${esc(t.nom)}" style="flex:1"><button type="button" class="ib" data-tdel="${i}" aria-label="Supprimer">${ic('trash')}</button></div>`).join('')}</div>
+  <button type="button" class="btn ghost" id="tAddL" style="align-self:flex-start">${ic('plus')}Ajouter une tâche</button>
+  ${U.map(u=>`<section class="card stack" style="gap:6px;padding:12px"><b>${esc(nameOf(u))}</b><div class="chips">${L.filter(t=>t.nom.trim()).map(t=>`<label class="chip" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" data-ta="${esc(u)}" data-tid="${esc(t.id)}" ${(A[u]||[]).includes(t.id)?'checked':''}>${esc(t.nom)}</label>`).join('')}</div></section>`).join('')}`;
+ const d=openModal({title:'Gérer les tâches',body:`<div id="tEd" class="stack" style="gap:10px">${draw()}</div>`,
+  onOk:()=>{const liste=L.filter(t=>t.nom.trim()).map(t=>({id:t.id,nom:t.nom.trim()}));const ids=new Set(liste.map(t=>t.id));const assign={};Object.entries(A).forEach(([u,l])=>assign[u]=l.filter(x=>ids.has(x)));
+   return W(()=>S.db.doc('cfg/taches').set({liste,assign,maj:Date.now()}),'Tâches enregistrées')}});
+ const B=$('#tEd',d);const re=()=>{B.innerHTML=draw()};
+ B.addEventListener('input',e=>{const x=e.target.closest('[data-tn]');if(x)L[+x.dataset.tn].nom=x.value});
+ B.addEventListener('change',e=>{const x=e.target.closest('[data-ta]');if(!x)return;const u=x.dataset.ta,id=x.dataset.tid;A[u]=A[u]||[];A[u]=x.checked?[...new Set([...A[u],id])]:A[u].filter(y=>y!==id)});
+ B.addEventListener('click',e=>{const x=e.target.closest('[data-tdel]');if(x){L.splice(+x.dataset.tdel,1);re()}if(e.target.closest('#tAddL')){L.push({id:'t'+Date.now().toString(36),nom:''});re();setTimeout(()=>B.querySelector(`[data-tn="${L.length-1}"]`)?.focus(),30)}})}
+async function tacheAdd(u){const nom=prompt('Tâche ponctuelle pour '+nameOf(u)+' (aujourd\'hui) :');if(!nom||!nom.trim())return;
+ await W(()=>S.db.doc(`taches/${u}/j/${today()}`).set({date:today(),extra:firebase.firestore.FieldValue.arrayUnion({id:'x'+Date.now().toString(36),nom:nom.trim()})},{merge:true}),'Tâche ajoutée');loadTachesTeam()}
+
+/* ---- Bloc-notes personnel ---- */
+Views.notes={mount(el){el.innerHTML=`<div class="stack"><div class="head"><div><div class="eyebrow">Personnel</div><h1>Bloc-notes</h1><div class="muted">Vos notes ne sont visibles que par vous.</div></div></div>${banners()}
+  <input class="inp" id="nq" type="search" placeholder="Rechercher dans mes notes" value="${esc(S.nQ||'')}"><div id="nList" class="notes-grid"></div></div><button class="btn pri big fab" data-act="noteEdit" data-id="">${ic('plus')}Note</button>`;
+  $('#nq').oninput=e=>{S.nQ=e.target.value;this.update()};this.update()},
+ update(){const L=$('#nList');if(!L)return;const q=norm(S.nQ||'');const N=(S.notes||[]).filter(n=>!q||norm(n.titre+' '+n.texte).includes(q)).sort((a,b)=>(b.epingle?1:0)-(a.epingle?1:0)||b.maj-a.maj);
+  L.innerHTML=N.length?N.map(n=>`<article class="note card" data-act="noteEdit" data-id="${esc(n.id)}" style="cursor:pointer;${n.c?'background:'+esc(n.c)+';color:#2a2418':''}">${n.epingle?'<span class="pill acc" style="float:right">Épinglée</span>':''}<h3>${esc(n.titre||'Sans titre')}</h3><div class="small" style="white-space:pre-wrap;max-height:8.5em;overflow:hidden">${esc(n.texte||'')}</div><div class="small muted" style="margin-top:6px">${new Date(n.maj).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})}</div></article>`).join('')
+  :'<div class="card"><div class="empty"><strong>Aucune note</strong>Ajoutez une note avec le bouton « Note ».</div></div>'}};
+function noteEdit(id){const n=(S.notes||[]).find(x=>x.id===id)||{titre:'',texte:'',c:''};const C=['','#f3e3b5','#d9ecd9','#d6e6f5','#f5d9d9','#e6dcf2'];
+ openModal({title:n.id?'Modifier la note':'Nouvelle note',del:n.id?'Supprimer':null,
+  body:`<label class="f">Titre<input class="inp" name="titre" id="no-t" value="${esc(n.titre)}"></label><label class="f">Note<textarea class="inp" name="texte" id="no-x" rows="9" style="min-height:200px">${esc(n.texte)}</textarea></label>
+  <div class="row" style="gap:8px;align-items:center"><span class="small muted">Couleur</span>${C.map((c,i)=>`<label style="display:inline-flex"><input type="radio" name="c" value="${c}" ${n.c===c||(!n.c&&!c)?'checked':''} style="accent-color:var(--gold-2)"><span style="width:20px;height:20px;border-radius:6px;border:1px solid var(--line);background:${c||'var(--surface)'};display:inline-block"></span></label>`).join('')}<span class="sp"></span><label class="small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="epingle" ${n.epingle?'checked':''}>Épingler</label></div>`,
+  onOk:f=>{if(!f.titre.trim()&&!f.texte.trim())return true;const data={titre:f.titre.trim(),texte:f.texte,c:f.c||'',epingle:!!f.epingle,maj:Date.now()};
+   return n.id?W(()=>S.db.doc(`notes/${S.uid}/n/${n.id}`).update(data)):W(()=>S.db.collection(`notes/${S.uid}/n`).add({...data,cree:Date.now()}),'Note ajoutée')},
+  onDel:async()=>{if(!await ask('Supprimer cette note ?','Supprimer'))return false;return W(()=>S.db.doc(`notes/${S.uid}/n/${n.id}`).delete(),'Note supprimée')}})}
+
 /* ---- Rapports de fin de journée (administrateur) ---- */
 const RAP_P={jour:'Jour',semaine:'Semaine',mois:'Mois',annee:'Année'};
 function rapRange(){const p=S.rapP||'jour',d=S.rapD||today();
@@ -1789,10 +1874,11 @@ async function loadRapports(){const O=$('#rapOut');if(!O||!S.db)return;const[a,b
  S.rapMiss=miss;
  if(a===b){const R=list[0];O.innerHTML=gen+nowBtn+(R?rapDayHTML(R):(miss.length?'':'<div class="card"><div class="empty"><strong>Pas encore de rapport</strong>Le rapport de ce jour sera créé ce soir à 20 h 30.</div></div>'));return}
  O.innerHTML=gen+(list.length?rapAggHTML(list,a,b):'<div class="card"><div class="empty"><strong>Aucun rapport sur cette période</strong></div></div>')}
-function rapAggHTML(L,a,b){const MD=n=>MAD0(n);const A={rdv:{total:0,termines:0,absents:0,annules:0},type:{},caisse:{total:0,n:0,mode:{}},corr:0,nouv:0,msg:0,soins:0,pt:{}};
+function rapAggHTML(L,a,b){const MD=n=>MAD0(n);const A={rdv:{total:0,termines:0,absents:0,annules:0},type:{},caisse:{total:0,n:0,mode:{}},corr:0,nouv:0,msg:0,soins:0,pt:{},tk:{}};
  L.forEach(R=>{const r=R.rdv||{};['total','termines','absents','annules'].forEach(k=>A.rdv[k]+=r[k]||0);Object.entries(r.parType||{}).forEach(([k,v])=>A.type[k]=(A.type[k]||0)+v);A.soins+=(r.soins||[]).length;
   const c=R.caisse||{};A.caisse.total+=c.total||0;A.caisse.n+=c.n||0;Object.entries(c.parMode||{}).forEach(([k,v])=>A.caisse.mode[k]=(A.caisse.mode[k]||0)+v);A.corr+=(c.corrections||[]).length;
   A.nouv+=(R.nouveauxPatients||[]).length;A.msg+=R.messages?.total||0;
+  (R.taches||[]).forEach(t=>{const o=A.tk[t.nom]=A.tk[t.nom]||{f:0,t:0};o.f+=t.faites;o.t+=t.total});
   (R.pointage||[]).forEach(p=>{const o=A.pt[p.nom]=A.pt[p.nom]||{jours:0,min:0,ret:0,retMin:0,abs:0,av:0};if(p.arrivee){o.jours++;o.min+=p.minutes||0}if(p.retard){o.ret++;o.retMin+=p.retard}if(p.absent)o.abs++;if(p.avance)o.av++})});
  const year=(S.rapP==='annee');const groups={};L.forEach(R=>{const k=year?R.date.slice(0,7):R.date;const g=groups[k]=groups[k]||{c:0,t:0};g.c+=R.caisse?.total||0;g.t+=R.rdv?.termines||0});const maxC=Math.max(1,...Object.values(groups).map(g=>g.c));
  const li=(x,y)=>`<div class="li"><div class="grow"><div class="t">${x}</div></div><span class="small">${y}</span></div>`;
@@ -1802,7 +1888,8 @@ function rapAggHTML(L,a,b){const MD=n=>MAD0(n);const A={rdv:{total:0,termines:0,
  <section class="card"><h3>Caisse <span class="pill acc">Visible par vous seul</span></h3><div class="mini-kpis"><div class="kpi"><b>${MD(A.caisse.total)}</b><span class="small muted">${A.caisse.n} encaissement(s)</span></div><div class="kpi"><b>${MD(A.caisse.total/Math.max(1,L.filter(R=>R.caisse?.n).length))}</b><span class="small muted">moyenne par jour travaillé</span></div></div>
   <div class="list">${Object.entries(A.caisse.mode).map(([k,v])=>li(esc(MODES[k]||k),MD(v))).join('')}</div>${A.corr?`<div class="small" style="color:var(--bad)">${A.corr} correction(s) d'encaissement sur la période.</div>`:''}</section></div>
  <section class="card"><h3>${year?'Par mois':'Par jour'}</h3><div class="list">${Object.keys(groups).sort().map(k=>`<div class="li" ${year?'':`style="cursor:pointer" data-act="rapDay" data-d="${k}"`}><span style="width:10ch" class="small">${esc(year?fmtMonth(k):capFirst(fmtDate(k,{weekday:'short',day:'numeric',month:'short'})))}</span><div class="grow"><div class="progress"><i style="width:${Math.round(groups[k].c/maxC*100)}%"></i></div></div><span class="num small" style="min-width:16ch;text-align:right">${MD(groups[k].c)} · ${groups[k].t} RDV</span></div>`).join('')}</div></section>
- <section class="card"><h3>Pointage de l'équipe</h3><div class="tablewrap"><table><thead><tr><th>Membre</th><th class="r">Jours</th><th class="r">Présence</th><th class="r">Retards</th><th class="r">Absences</th><th class="r">Départs anticipés</th></tr></thead><tbody>${Object.entries(A.pt).map(([n,o])=>`<tr><td>${esc(n)}</td><td class="r num">${o.jours}</td><td class="r num">${dur(o.min*60000)}</td><td class="r num">${o.ret?`<span class="pill bad">${o.ret} · ${o.retMin} min</span>`:'0'}</td><td class="r num">${o.abs?`<span class="pill bad">${o.abs}</span>`:'0'}</td><td class="r num">${o.av||0}</td></tr>`).join('')}</tbody></table></div></section>`}
+ <section class="card"><h3>Pointage de l'équipe</h3><div class="tablewrap"><table><thead><tr><th>Membre</th><th class="r">Jours</th><th class="r">Présence</th><th class="r">Retards</th><th class="r">Absences</th><th class="r">Départs anticipés</th></tr></thead><tbody>${Object.entries(A.pt).map(([n,o])=>`<tr><td>${esc(n)}</td><td class="r num">${o.jours}</td><td class="r num">${dur(o.min*60000)}</td><td class="r num">${o.ret?`<span class="pill bad">${o.ret} · ${o.retMin} min</span>`:'0'}</td><td class="r num">${o.abs?`<span class="pill bad">${o.abs}</span>`:'0'}</td><td class="r num">${o.av||0}</td></tr>`).join('')}</tbody></table></div></section>
+ ${Object.keys(A.tk).length?`<section class="card"><h3>Tâches de l'équipe</h3><div class="list">${Object.entries(A.tk).map(([n,o])=>`<div class="li"><div class="grow"><div class="t">${esc(n)}</div><div class="s">${o.f} faite(s) sur ${o.t}</div></div><span class="pill ${o.f===o.t?'ok':o.f/o.t>=.8?'warn':'bad'}">${Math.round(o.f/Math.max(1,o.t)*100)} %</span></div>`).join('')}</div></section>`:''}`}
 function rapDayHTML(R){R={...R,id:R.date||R.id};const out=document.createElement('div');S._rapTmp=R;return rapDayInner(R)}
 function rapDayInner(R){
  const li=(a,b)=>`<div class="li"><div class="grow"><div class="t">${a}</div></div><span class="small">${b}</span></div>`;const MD=n=>MAD0(n);const r=R.rdv||{};const c=R.caisse||{};
@@ -1812,6 +1899,7 @@ function rapDayInner(R){
  <section class="card"><h3>Caisse <span class="pill acc">Visible par vous seul</span></h3><div class="mini-kpis"><div class="kpi"><b>${MD(c.total)}</b><span class="small muted">${c.n||0} encaissement(s)</span></div></div><div class="list">${Object.entries(c.parMode||{}).map(([k,v])=>li(esc(MODES[k]||k),MD(v))).join('')}</div>
   ${(c.corrections||[]).length?`<div class="banner warn">Corrections : ${c.corrections.map(x=>`${esc(x.par)}${x.patient?' ('+esc(x.patient)+')':''} : ${x.avant!=null?MD(x.avant)+' → ':''}${MD(x.apres)}`).join(' · ')}</div>`:''}${c.illisibles?`<div class="small muted">${c.illisibles} saisie(s) illisible(s).</div>`:''}</section></div>
  <section class="card"><h3>Pointage de l'équipe</h3><div class="tablewrap"><table><thead><tr><th>Membre</th><th>Arrivée</th><th>Départ</th><th class="r">Présence</th></tr></thead><tbody>${(R.pointage||[]).map(p=>`<tr><td>${esc(p.nom)}</td><td>${p.arrivee?esc(p.arrivee)+(p.retard?` <span class="pill bad">+${p.retard} min</span>`:''):p.repos?'<span class="small muted">Repos</span>':'<span class="pill bad">Absent</span>'}</td><td>${p.depart?esc(p.depart)+(p.avance?` <span class="pill warn">−${p.avance} min</span>`:''):p.sansDepart?'<span class="pill warn">non pointé</span>':'—'}</td><td class="r num">${p.minutes!=null?dur(p.minutes*60000):'—'}</td></tr>`).join('')}</tbody></table></div></section>
+ ${(R.taches||[]).length?`<section class="card"><h3>Tâches de l'équipe</h3><div class="list">${R.taches.map(t=>`<div class="li"><div class="grow"><div class="t">${esc(t.nom)}</div>${t.restantes.length?`<div class="s" style="color:var(--bad)">Non faites : ${esc(t.restantes.join(', '))}</div>`:'<div class="s">Toutes les tâches sont faites.</div>'}</div><span class="pill ${t.faites===t.total?'ok':'bad'}">${t.faites}/${t.total}</span></div>`).join('')}</div></section>`:''}
  ${(r.soins||[]).length?`<section class="card"><h3>Soins réalisés (${r.soins.length})</h3><div class="list">${r.soins.map(x=>`<div class="li"><span class="timechip">${esc(x.h)}</span><div class="grow"><div class="t">${esc(x.patient)}</div><div class="s">${esc(x.soin)}${x.dents?' · dent '+esc(x.dents):''}${x.suite?' · suite : '+esc(x.suite):''}</div></div></div>`).join('')}</div></section>`:''}
  <div class="grid2"><section class="card"><h3>Patients</h3><div class="small">${(R.nouveauxPatients||[]).length?`<b>${R.nouveauxPatients.length} nouveau(x)</b> : ${esc(R.nouveauxPatients.join(', '))}`:'Aucun nouveau patient.'}</div></section>
  <section class="card"><h3>Stock</h3><div class="small">${R.stock?.mouvements||0} article(s) mouvementé(s) · ${R.stock?.peu||0} à 2 pièces ou moins</div>${(R.stock?.aCommander||[]).length?`<div class="small" style="margin-top:6px"><span class="pill bad">À commander</span> ${esc(R.stock.aCommander.join(', '))}</div>`:''}</section></div>
@@ -1939,7 +2027,7 @@ async function purge(k){const conf={messages:['ts',180,'les messages de plus de 
   toast(n?`${n} élément${n>1?'s':''} supprimé${n>1?'s':''}`+(n===300?' (relancez pour continuer)':''):'Rien à supprimer')}catch(e){console.warn(e);toast(errMsg(e),'err')}}
 
 /* ---------- actions ---------- */
-const Acts={cTab:a=>{S.cTab=a.dataset.t;go('compta')},factEdit:a=>factEdit(a.dataset.id),assEdit:a=>assEdit(a.dataset.id),fourEdit:a=>fourEdit(a.dataset.id),fourOpen:a=>fourOpen(a.dataset.id),assSel:a=>{const F=S.aF;const c=a.dataset.c;F.sel=F.sel.includes(c)?F.sel.filter(x=>x!==c):[...F.sel,c];Views.compta.update()},rapP:a=>{S.rapP=a.dataset.p;go('rapports')},rapShift:a=>rapShift(+a.dataset.n),rapDay:a=>{S.rapP='jour';S.rapD=a.dataset.d;go('rapports')},rapGen:async a=>{const m=S.rapMiss||[];if(!m.length)return;a.disabled=true;a.textContent='Génération en cours… ('+m.length+' jours)';for(let i=0;i<m.length;i+=31){await W(()=>S.db.doc('cfg/rapportDemande').set({dates:m.slice(i,i+31),ts:Date.now()}));await new Promise(r=>setTimeout(r,1500))}toast('Génération lancée : les rapports apparaissent en quelques minutes.');setTimeout(loadRapports,20000);setTimeout(loadRapports,60000)},rapNow:async a=>{if(!await W(()=>S.db.doc('cfg/rapportDemande').set({date:today(),ts:Date.now()})))return;a.disabled=true;a.textContent='Génération en cours…';S.rapP='jour';S.rapD=today();setTimeout(loadRapports,9000);setTimeout(()=>{loadRapports();a.disabled=false;a.textContent='Générer maintenant'},25000)},horairesEdit,demo:a=>demoStart(a.dataset.u),demoExit,demoSite:()=>{S.demoSite=S.demoSite==='out'?'in':'out';restartData();renderNav();if(!allowedView(S.view))go('accueil');else go(S.view)},siteRetry:()=>{setSite('checking');if(siteWatch!=null){navigator.geolocation.clearWatch(siteWatch);siteWatch=null}startSite()},
+const Acts={factYear:a=>{S.cF={...(S.cF||{}),annee:a.dataset.y};Views.compta.update()},factZip,tachesEdit,tLoad:()=>loadTachesTeam(),tacheAdd:a=>tacheAdd(a.dataset.u),noteEdit:a=>noteEdit(a.dataset.id),cTab:a=>{S.cTab=a.dataset.t;go('compta')},factEdit:a=>factEdit(a.dataset.id),assEdit:a=>assEdit(a.dataset.id),fourEdit:a=>fourEdit(a.dataset.id),fourOpen:a=>fourOpen(a.dataset.id),assSel:a=>{const F=S.aF;const c=a.dataset.c;F.sel=F.sel.includes(c)?F.sel.filter(x=>x!==c):[...F.sel,c];Views.compta.update()},rapP:a=>{S.rapP=a.dataset.p;go('rapports')},rapShift:a=>rapShift(+a.dataset.n),rapDay:a=>{S.rapP='jour';S.rapD=a.dataset.d;go('rapports')},rapGen:async a=>{const m=S.rapMiss||[];if(!m.length)return;a.disabled=true;a.textContent='Génération en cours… ('+m.length+' jours)';for(let i=0;i<m.length;i+=31){await W(()=>S.db.doc('cfg/rapportDemande').set({dates:m.slice(i,i+31),ts:Date.now()}));await new Promise(r=>setTimeout(r,1500))}toast('Génération lancée : les rapports apparaissent en quelques minutes.');setTimeout(loadRapports,20000);setTimeout(loadRapports,60000)},rapNow:async a=>{if(!await W(()=>S.db.doc('cfg/rapportDemande').set({date:today(),ts:Date.now()})))return;a.disabled=true;a.textContent='Génération en cours…';S.rapP='jour';S.rapD=today();setTimeout(loadRapports,9000);setTimeout(()=>{loadRapports();a.disabled=false;a.textContent='Générer maintenant'},25000)},horairesEdit,demo:a=>demoStart(a.dataset.u),demoExit,demoSite:()=>{S.demoSite=S.demoSite==='out'?'in':'out';restartData();renderNav();if(!allowedView(S.view))go('accueil');else go(S.view)},siteRetry:()=>{setSite('checking');if(siteWatch!=null){navigator.geolocation.clearWatch(siteWatch);siteWatch=null}startSite()},
  more:openMore,pointer,
  startTpl:a=>{if(perm('mod_checklists'))startTpl(a.dataset.id)},
  resumeRun:a=>{S.run=a.dataset.id;S.runLocal=null;go('checklists')},
@@ -1959,7 +2047,7 @@ const Acts={cTab:a=>{S.cTab=a.dataset.t;go('compta')},factEdit:a=>factEdit(a.dat
  pickImg:()=>$('#imgfile').click(),pickAud:()=>startRec(),
  delMsg:async a=>{if(!await ask('Supprimer ce message pour tout le monde ?','Supprimer'))return;const m=S.grpMsgs.find(x=>x.id===a.dataset.id);
   const ok=await W(()=>S.db.doc('messages/'+a.dataset.id).delete());if(ok&&m?.asset&&S.assets){try{await S.assets.delete(m.asset)}catch(e){}}},
- zoom:a=>{openModal({title:'Photo',ok:null,cancel:'Fermer',body:`<img src="${esc(a.getAttribute('src'))}" alt="${esc(a.alt)}" style="width:100%;border-radius:10px">`})},
+ zoom:a=>photoView(a.getAttribute('src')||a.dataset.src,a.alt),
  stockEdit:a=>{if(perm('stock_edit'))stockEdit(a.dataset.id)},qty:a=>changeQty(a.dataset.id,Number(a.dataset.n)),
  stFilter:a=>{S.stockFilter=a.dataset.k;S.stockQ='';const q=$('#stq');if(q)q.value='';stockUpdate();window.scrollTo(0,0)},stockCatalog:a=>stockCatalog(a.dataset.k),ptSetCab,ptRayon:()=>{const r=Math.max(5,Math.min(2000,Number($('#ptRayon')?.value)||10));W(()=>S.db.doc('cfg/cabinet').update({rayon:r}),'Rayon : '+r+' m')},scanIn:()=>{S.scanMode='in';scanModal()},scanOut:()=>{S.scanMode='out';scanModal()},stockLow:()=>{S.stockFilter='bas';go('stock')},orderList,
  caTab:a=>{S.caisseTab=a.dataset.t;go('caisse')},caActivate,reLoad:loadRecettes,
@@ -1975,7 +2063,7 @@ const Acts={cTab:a=>{S.cTab=a.dataset.t;go('compta')},factEdit:a=>factEdit(a.dat
  labNew:()=>labModal(),labOpen:a=>labModal(S.labo.find(x=>x.id===a.dataset.id)),
  labNext:a=>{const c=S.labo.find(x=>x.id===a.dataset.id);if(!c)return;const nx=LAB[c.section].steps[labStepIdx(c)+1];if(nx)labSetStep(c,nx[0])},
  labAddPhoto:a=>{if(!S.assets){toast('L\'ajout de photos demande un accès Éditeur à la page.','err');return}S.labUpId=a.dataset.id;S.labCat=a.dataset.c||'travail';$('#labfile').click()},alRemis:a=>{if(a.closest('#dlg'))$('#dlg').close();alRemis(a.dataset.id)},
- labZoom:async a=>{const src=await blobReady(a.dataset.a);const w=window.open?null:null;const d=$('#ask');d.innerHTML=`<div class="dlg-in"><div class="dlg-b"><img src="${esc(src)}" alt="Photo du travail" style="width:100%;border-radius:12px"></div><footer><span class="sp"></span><button class="btn pri" id="askn">Fermer</button></footer></div>`;$('#askn').onclick=()=>d.close();d.onclose=null;d.showModal()},
+ labZoom:async a=>{const src=await blobReady(a.dataset.a);photoView(src,'Photo du travail')},
  labShare:a=>labShare(a.dataset.id),memRefuse:async a=>{const u=a.dataset.u;if(await ask('Refuser l\'accès de '+nameOf(u)+' ?','Refuser'))setMember(u,{statut:'refuse',le:Date.now()},'Demande refusée')},
  openPat:a=>openPatient(a.dataset.id),patMode:a=>{S.patMode=a.dataset.m;S.patLetter='';searchPatients()},patLetter:a=>{S.patLetter=a.dataset.l;searchPatients()},patMore:a=>{a.disabled=true;a.textContent='Chargement…';loadPatPage(true)},closePat:()=>{closePatient();go('patients')},patNew:()=>patModal(),patEdit:()=>patModal(S.patDoc),
  patRdv:()=>{const p=S.patDoc;rdvModal({date:today(),heure:'',duree:30,statut:'prevu',patient:patName(p),patientId:p.id,tel:p.tel||''})},
@@ -2026,6 +2114,8 @@ function startData(){if(S.dataStarted||gated())return;S.dataStarted=true;const d
  if(perm('labo_voir'))addSub(db.collection('labo').orderBy('maj','desc').limit(500).onSnapshot(s=>{S.labo=s.docs.map(d=>({id:d.id,...d.data()}));refresh('labo','accueil','patients');const P=$('#labPhotos');if(P){const c=S.labo.find(x=>x.id===P.dataset.id);if(c)P.innerHTML=labPhotosHTML(c)}},w));
  if(perm('compta_voir')||perm('mod_stock')||perm('labo_voir'))addSub(db.collection('fournisseurs').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]={id:d.id,...d.data()});S.four=o;refresh('compta','stock','labo')},w));
  if(perm('compta_voir')){addSub(db.collection('factures').orderBy('date','desc').limit(1500).onSnapshot(s=>{S.factures=s.docs.map(d=>({id:d.id,...d.data()}));refresh('compta')},w));addSub(db.collection('assurances').orderBy('date','desc').limit(3000).onSnapshot(s=>{S.assur=s.docs.map(d=>({id:d.id,...d.data()}));refresh('compta')},w))}
+ if(perm('mod_notes'))addSub(db.collection(`notes/${S.uid}/n`).onSnapshot(s=>{S.notes=s.docs.map(d=>({id:d.id,...d.data()}));refresh('notes')},w));
+ if(perm('mod_taches'))addSub(db.doc(`taches/${S.uid}/j/${today()}`).onSnapshot(s=>{S.myTaches=s.exists?s.data():null;refresh('accueil','taches')},w));
  if(perm('mod_checklists'))addSub(db.collection('executions').where('date','==',today()).onSnapshot(s=>{S.execToday=s.docs.map(d=>({id:d.id,...d.data()}));refresh('checklists','accueil')},w));
  if(perm('mod_pointage'))addSub(db.doc(`pointage/${S.uid}/j/${today()}`).onSnapshot(s=>{S.myPointage=s.exists?s.data():null;refresh('accueil','pointage')},w));
  if(perm('caisse'))addSub(db.collection(`recettes/${S.uid}/e`).where('date','==',today()).onSnapshot(s=>{S.myRecCount=s.size;S.myRec=s.docs.map(d=>({id:d.id,...d.data()}));refresh('caisse')},w));
