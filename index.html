@@ -735,7 +735,9 @@ async function pointer(){
  const cab=S.cfg.cabinet;let loc=null;
  if(cab?.lat!=null&&!S.isOwner){toast('Vérification de votre position…');let c;try{c=await getPos()}catch(e){toast(geoErr(e),'err');return}
   const d=Math.round(distM(cab,{lat:c.latitude,lng:c.longitude})),acc=Math.round(c.accuracy||0),R=Number(cab.rayon)||10;
-  if(d-Math.min(acc,SITE_TOL)>R){toast('Pointage indisponible pour le moment.','err');return}
+  const v=siteVerdict(d,acc,R,S.site==='in');presLog(v===null?'imprecis':v?'in':'out',d,acc);
+  if(v===null&&S.site!=='in'){toast('Position trop imprécise : activez le Wi-Fi et la « Position exacte », puis réessayez.','err');return}
+  if(v===false){toast('Pointage indisponible pour le moment.','err');return}
   loc={d,acc}}
  {const sl=slotsOf(today()),n=minOf(Date.now());const ok=sl.length&&n>=toMin(sl[0][0])-60&&n<=toMin(sl[sl.length-1][1])+60;
   if(!ok&&!await ask(sl.length?`Vous êtes en dehors des horaires du jour (${slotsTxt(sl)}). Pointer quand même ?`:'Aujourd\'hui est un jour de repos. Pointer quand même ?','Pointer'))return;if(!ok)loc={...(loc||{}),hors:true}}
@@ -821,7 +823,11 @@ function photoView(src,alt){const v=document.createElement('div');v.className='p
  v.addEventListener('wheel',e=>{e.preventDefault();zoomAt(sc*(e.deltaY<0?1.15:1/1.15),e.clientX,e.clientY)},{passive:false});
  v.addEventListener('click',e=>{if(e.target===v)close()});document.addEventListener('keydown',function k(e){if(e.key==='Escape'){close();document.removeEventListener('keydown',k)}})}
 /* ---- Présence au cabinet (GPS) ---- */
-const SITE_TOL=30;
+const SITE_TOL=60,SITE_MAXACC=150;
+/* Décide à partir d'une mesure GPS : true = au cabinet, false = dehors, null = mesure trop imprécise pour conclure */
+function siteVerdict(d,acc,R,wasIn){if(acc>SITE_MAXACC)return d-SITE_MAXACC>R+200?false:null;const eff=d-Math.max(20,Math.min(acc,SITE_TOL));return eff<=R+(wasIn?25:0)}
+function presLog(st,d,acc){try{if(S.demo||S._owner||!S.uid||!S.db)return;const k=st+'|'+Math.round(d/10);const now=Date.now();if(S._presK===k&&now-(S._presT||0)<600000)return;S._presK=k;S._presT=now;
+ S.db.doc('presence/'+S.uid).set({st,d:Math.round(d),acc:Math.round(acc),t:now}).catch(()=>{})}catch(e){}}
 function demoBanner(){return `<div class="banner info demo-bar">${ic('users')}<div style="flex:1"><b>Mode démo : ${esc(nameOf(S.demo))}</b><div class="small">${esc(ROLES[memberOf(S.demo)?.role]||'')} — vous voyez exactement ce que voit ce membre. Rien n'est enregistré.</div></div>
  <button class="btn ghost" data-act="demoSite">${S.demoSite==='out'?'Simuler : au cabinet':'Simuler : hors cabinet'}</button><button class="btn pri" data-act="demoExit">Quitter la démo</button></div>`}
 function demoStart(u){if(!S._owner)return;S.demo=u;S.demoSite='in';$('#dlg')?.open&&$('#dlg').close();restartData();renderNav();go('accueil');toast('Démo : '+nameOf(u))}
@@ -832,12 +838,17 @@ function setSite(st,info){const before=siteLock();S.site=st;S.siteInfo=info||{};
  const after=siteLock();S.lockPrev=after;if(before!==after)applyLock();else if(S.view==='accueil'||!after)refresh()}
 setInterval(()=>{if(!S.dataStarted)return;const l=siteLock();if(S.lockPrev!==undefined&&l!==S.lockPrev)applyLock();S.lockPrev=l},30000);
 function sitePos(p){const c=p.coords||p;const cab=S.cfg?.cabinet;if(!cab||cab.lat==null)return;const d=distM(cab,{lat:c.latitude,lng:c.longitude}),acc=c.accuracy||0,R=Number(cab.rayon)||10;
- const eff=d-Math.min(acc,SITE_TOL);const ins=S.site==='in'?eff<=R+15:eff<=R;setSite(ins?'in':'out',{d,acc})}
+ const wasIn=S.site==='in';const v=siteVerdict(d,acc,R,wasIn);presLog(v===null?'imprecis':v?'in':'out',d,acc);
+ if(v===true){S._outN=0;setSite('in',{d,acc});return}
+ if(v===null){if(!wasIn){S._impN=(S._impN||0)+1;if(S._impN>=3)setSite('out',{d,acc})}return}
+ // dehors : on exige deux mesures concordantes à au moins 45 s d'intervalle avant de verrouiller quelqu'un qui était au cabinet
+ if(wasIn){const now=Date.now();if(!S._outN||now-(S._outT||0)>600000){S._outN=1;S._outT=now;return}if(now-S._outT<45000)return;S._outN=0}
+ setSite('out',{d,acc})}
 let siteWatch=null;
 function startSite(){if(S._owner||!S.cfg?.cabinet||S.cfg.cabinet.lat==null)return;
- if(!S.site){const last=Number(ls.get('ns_site_in',0));S.site=Date.now()-last<120000?'in':'checking'}
+ if(!S.site){const last=Number(ls.get('ns_site_in',0));S.site=Date.now()-last<20*60000?'in':'checking'}
  if(!navigator.geolocation){setSite('nogps',{msg:'Cet appareil ne permet pas de vérifier votre position (pas de GPS).'});return}
- const err=e=>setSite('nogps',{msg:geoErr(e)});
+ const err=e=>{if(S.site==='in'&&Date.now()-Number(ls.get('ns_site_in',0))<20*60000&&e?.code!==1)return;presLog('erreur'+(e?.code||''),0,0);setSite('nogps',{msg:geoErr(e)})};
  navigator.geolocation.getCurrentPosition(sitePos,err,{enableHighAccuracy:true,timeout:20000,maximumAge:15000});
  if(siteWatch==null)siteWatch=navigator.geolocation.watchPosition(sitePos,err,{enableHighAccuracy:true,maximumAge:20000,timeout:60000})}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&S.site){S.site=S.site==='in'?'in':'checking';startSite()}});
@@ -1686,10 +1697,10 @@ Views.pointage={
  <div class="card stack" style="gap:8px"><div class="row"><h3>Horaires de travail</h3><span class="sp"></span>${S.isOwner?`<button class="btn ghost" data-act="horairesEdit">${ic('edit')}Modifier</button>`:''}</div>
   <div class="list">${[1,2,3,4,5,6,0].map(k=>{const sl=(horaires().jours[k]||[]);return `<div class="li"><div class="grow"><div class="t">${JOURS[k]}</div></div><span class="${sl.length?'':'muted'} small">${esc(slotsTxt(sl))}</span></div>`}).join('')}</div>
   <div class="small muted">Tolérance de retard : ${esc(horaires().tol??10)} min.</div></div>
- ${S.isOwner?`<div class="card stack" style="gap:10px"><h3>Position du cabinet</h3><div class="small muted">Hors de ce rayon (ou sans GPS), les membres n'ont accès qu'aux groupes de discussion : agenda, patients, stock, caisse, pointage… sont bloqués. Votre compte n'est jamais limité. La précision du GPS en intérieur est de 10 à 30 m : une marge de 30 m est ajoutée au rayon.</div>
-  <div id="ptCab"></div></div>
+ ${S.isOwner?`<div class="card stack" style="gap:10px"><h3>Position du cabinet</h3><div class="small muted">Hors de ce rayon (ou sans GPS), les membres n'ont accès qu'aux groupes de discussion : agenda, patients, stock, caisse, pointage… sont bloqués. Votre compte n'est jamais limité. À l'intérieur d'un bâtiment, le GPS d'un téléphone peut se tromper de 20 à 60 m : la précision annoncée par le téléphone (jusqu'à 60 m) est ajoutée au rayon.</div>
+  <div id="ptCab"></div><h3 style="margin-top:6px">Dernière position reçue de chaque membre</h3><div class="small muted">Utile pour régler le rayon : si un membre présent au cabinet apparaît « hors cabinet », augmentez le rayon.</div><div id="ptPres" class="small muted">Chargement…</div></div>
   <div class="card stack" style="gap:10px"><div class="row"><h3>Équipe</h3><span class="sp"></span><input class="inp" type="date" id="ptDate" value="${S.ptDate||today()}" style="width:auto" aria-label="Jour"><button class="ib" data-act="ptLoad" aria-label="Actualiser">${ic('refresh')}</button></div><div id="ptTeam" class="small muted">Chargement…</div></div>`:''}</div>`;
-  if(S.isOwner)$('#ptDate').onchange=e=>{S.ptDate=e.target.value||today();loadTeam()};loadMyHist();if(S.isOwner)loadTeam()},
+  if(S.isOwner)$('#ptDate').onchange=e=>{S.ptDate=e.target.value||today();loadTeam()};loadMyHist();if(S.isOwner){loadTeam();loadPresence()}},
  updCab(){const b=$('#ptCab');if(!b)return;const c=S.cfg.cabinet;b.innerHTML=`${c?.lat!=null?`<div class="banner info">${ic('check')}Position enregistrée (${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}), rayon ${esc(c.rayon||10)} m. <a href="https://maps.google.com/?q=${c.lat},${c.lng}" target="_blank" rel="noopener">Voir sur la carte</a></div>`:`<div class="banner warn">${ic('alert')}Position non définie : le pointage n'est pas encore limité au cabinet.</div>`}
   <div class="row" style="gap:8px;flex-wrap:wrap"><label class="f" style="width:140px">Rayon (mètres)<input class="inp" type="number" min="5" max="2000" step="5" id="ptRayon" value="${esc(c?.rayon||10)}"></label><span class="sp"></span><button class="btn pri" data-act="ptSetCab">${ic('refresh')}Enregistrer ma position actuelle comme cabinet</button>${c?.lat!=null?`<button class="btn ghost" data-act="ptRayon">Modifier le rayon</button>`:''}</div>`},
  update(){Views.pointage.updCab();const b=$('#ptMine');if(!b)return;const st=ptState(S.myPointage);
@@ -2256,6 +2267,10 @@ async function mfaOff(){if(!await ask('Désactiver la double authentification ?'
 function netBanner(){let b=document.getElementById('offb');if(navigator.onLine){if(b){b.textContent='Connexion rétablie — synchronisation…';b.classList.add('on');setTimeout(()=>b.remove(),2500)}return}
  if(!b){b=document.createElement('div');b.id='offb';document.body.appendChild(b)}b.classList.remove('on');b.textContent='Hors connexion — consultation possible, vos saisies seront envoyées dès le retour du réseau.'}
 addEventListener('online',netBanner);addEventListener('offline',netBanner);if(!navigator.onLine)setTimeout(netBanner,500);
+/* ---- Diagnostic de présence (administrateur) ---- */
+async function loadPresence(){const el=$('#ptPres');if(!el||!S._owner)return;try{const q=await S.db.collection('presence').get();const L=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.t-a.t);
+ const lab={in:['ok','Au cabinet'],out:['bad','Hors cabinet'],imprecis:['','Position imprécise'],erreur1:['bad','Localisation refusée'],erreur2:['bad','Position indisponible'],erreur3:['','Délai GPS dépassé']};
+ el.innerHTML=L.length?`<div class="list">${L.map(p=>{const[c,t]=lab[p.st]||['',p.st];return `<div class="li"><div class="grow"><div class="t">${esc(nameOf(p.id))}</div><div class="s">${p.d||p.acc?`à ${p.d} m du cabinet · précision ± ${p.acc} m · `:''}${esc(new Date(p.t).toLocaleString('fr-FR',{weekday:'short',hour:'2-digit',minute:'2-digit'}))}</div></div><span class="pill ${c}">${esc(t)}</span></div>`}).join('')}</div>`:'Aucune donnée pour le moment.'}catch(e){el.textContent='Indisponible.'}}
 /* ---- Rapports de fin de journée (administrateur) ---- */
 const RAP_P={jour:'Jour',semaine:'Semaine',mois:'Mois',annee:'Année'};
 function rapRange(){const p=S.rapP||'jour',d=S.rapD||today();
