@@ -887,7 +887,7 @@ Views.agenda={
     <div class="grow" data-act="${dayOnly()?'rdvMenu':'rdvEdit'}" data-id="${esc(r.id)}"><div style="font-weight:600">${esc(r.patient||'Patient')}${soinTag(r)}</div><div class="small muted">${esc([r.acte,r.praticien,r.tel].filter(Boolean).join(' · '))}</div>${r.soins?.texte?`<div class="small"><b>Soins :</b> ${esc(r.soins.texte)}</div>`:''}${(r.pec||[]).length?`<div class="small muted">Pris en charge : ${esc(r.pec.map(x=>nameOf(x.by)+' '+hm(x.ts)).join(', '))}</div>`:''}${r.note?`<div class="small muted">${esc(r.note)}</div>`:''}</div>
     <div class="rdv-side">${r.patientId&&perm('pat_voir')?`<button class="ib" data-act="openPat" data-id="${esc(r.patientId)}" aria-label="Ouvrir la fiche patient" title="Fiche patient">${ic('folder')}</button>`:''}<select class="sel-pill st-${esc(r.statut||'prevu')}" aria-label="Statut" data-rdvstat="${esc(r.id)}" ${perm('rdv_gerer')||perm('rdv_jour')?'':'disabled'}>${Object.entries(STATUTS).map(([k,v])=>`<option value="${k}" ${r.statut===k?'selected':''}>${esc(v)}</option>`).join('')}</select></div>
    </div>`).join(''):`<div class="empty"><strong>Aucun rendez-vous ce jour</strong>${perm('rdv_gerer')?'Ajoutez le premier avec le bouton « Rendez-vous ».':''}</div>`;
-  $$('[data-rdvstat]').forEach(s=>s.onchange=async()=>{if(await W(()=>S.db.doc('rdv/'+s.dataset.rdvstat).update({statut:s.value,maj:Date.now(),par:S.uid}),'Statut : '+STATUTS[s.value])){const r=S.rdvSel.find(x=>x.id===s.dataset.rdvstat);if(r)patDates(r.patientId,r.date,s.value)}});
+  $$('[data-rdvstat]').forEach(s=>s.onchange=async()=>{const r0=S.rdvSel.find(x=>x.id===s.dataset.rdvstat);if(await W(()=>Promise.all(rdvIds(r0||{id:s.dataset.rdvstat}).map(id=>S.db.doc('rdv/'+id).update({statut:s.value,maj:Date.now(),par:S.uid}))),'Statut : '+STATUTS[s.value])){const r=S.rdvSel.find(x=>x.id===s.dataset.rdvstat);if(r)patDates(r.patientId,r.date,s.value)}});
  }};
 /* Appui long sur un rendez-vous : actions rapides */
 (function(){let t=null,x0=0,y0=0,fired=false;const L=()=>$('#agList');
@@ -928,7 +928,7 @@ function rdvSoins(r){const so=r.soins||{};openModal({title:'Soins de la séance'
 function rdvNote(r){openModal({title:'Note',body:`<div class="small muted">${esc(r.patient||'')}</div><label class="f">Note du rendez-vous<textarea class="inp" name="note" id="nt-t" rows="4">${esc(r.note||'')}</textarea></label>`,
  onOk:f=>W(()=>S.db.doc('rdv/'+r.id).update({note:f.note.trim(),maj:Date.now(),par:S.uid}),'Note enregistrée')})}
 function subRdvSel(){S.subs.rdvSel?.();S.rdvSel=[];if(!S.db||!S.uid||!(perm('rdv_voir')||perm('rdv_jour')))return;if(dayOnly())S.agDate=today();
- S.subs.rdvSel=S.db.collection('rdv').where('date','==',S.agDate).onSnapshot(s=>{S.rdvSel=s.docs.map(d=>({id:d.id,...d.data()}));refresh('agenda')},e=>console.warn(e))}
+ S.subs.rdvSel=S.db.collection('rdv').where('date','==',S.agDate).onSnapshot(s=>{S.rdvSel=rdvView(s.docs.map(d=>({id:d.id,...d.data()})));refresh('agenda')},e=>console.warn(e))}
 function rdvModal(r){r=r||{date:S.agDate,heure:'',duree:30,statut:'prevu'};const ro=!perm('rdv_gerer');S.patPick={};
  const praticiens=teamMembers().filter(u=>['dentiste','stagiaire'].includes(roleOf(u))).map(nameOf);
  const d=openModal({title:ro?'Rendez-vous':r.id?'Modifier le rendez-vous':'Nouveau rendez-vous',del:r.id&&perm('rdv_suppr')?'Supprimer':null,ok:ro?null:'Enregistrer',cancel:ro?'Fermer':'Annuler',
@@ -2198,11 +2198,29 @@ function pecModal(r){const C=(S.steril||[]).filter(c=>c.date>=addDays(today(),-1
    if(S.steril?.length){const known=new Map((S.steril||[]).map(c=>[lotNorm(c.lot),c]));const bad=L.filter(l=>known.get(l)?.resultat==='non_conforme');if(bad.length){toast('Lot NON CONFORME : '+bad.join(', ')+'. Ces instruments ne doivent pas être utilisés.','err');return false}
     const unk=L.filter(l=>!known.has(l));if(unk.length&&!await ask(`Numéro inconnu : ${unk.join(', ')}. Aucun cycle de stérilisation n'est enregistré avec ce numéro. Continuer quand même ?`,'Continuer'))return false}
    const data={pec:firebase.firestore.FieldValue.arrayUnion({by:S.uid,ts:Date.now(),lots:L}),lots:firebase.firestore.FieldValue.arrayUnion(...L),maj:Date.now(),par:S.uid};if(['prevu','confirme','arrive'].includes(r.statut||'prevu'))data.statut='encours';
-   const ok=await W(()=>S.db.doc('rdv/'+r.id).update(data),'Patient pris en charge');
+   const ok=await W(async()=>{await S.db.doc('rdv/'+r.id).update(data);if(data.statut)for(const id of (r._dup||[]))await S.db.doc('rdv/'+id).update({statut:data.statut,maj:Date.now(),par:S.uid})},'Patient pris en charge');
    if(ok){const prev=[...(S.rdvToday||[]),...(S.rdvSel||[])].filter((x,i,a)=>x.id!==r.id&&x.statut==='encours'&&a.findIndex(y=>y.id===x.id)===i&&(x.pec||[]).length&&x.pec[x.pec.length-1].by===S.uid);
-    for(const x of prev)S.db.doc('rdv/'+x.id).update({statut:'termine',maj:Date.now(),par:S.uid}).catch(e=>console.warn(e))}
+    for(const x of prev)rdvIds(x).forEach(id=>S.db.doc('rdv/'+id).update({statut:'termine',maj:Date.now(),par:S.uid}).catch(e=>console.warn(e)))}
    return ok}});
  d.querySelectorAll('[data-lot]').forEach(b=>b.onclick=()=>{const i=$('#pc-l',d);const v=new Set(i.value.split(/[\s,;]+/).filter(Boolean));v.has(b.dataset.lot)?v.delete(b.dataset.lot):v.add(b.dataset.lot);i.value=[...v].join(', ');b.setAttribute('aria-pressed',v.has(b.dataset.lot))});setTimeout(()=>$('#pc-l',d)?.focus(),80)}
+/* ---- Vue des rendez-vous : fusion des doublons (logiciel + application) et un seul « en cours » par membre ---- */
+const ST_RANK={annule:-1,prevu:0,confirme:1,arrive:2,encours:3,absent:4,termine:4};
+const rdvKey=r=>r.patientId||norm(r.patient||'');
+function rdvView(raw){const L=raw.map(r=>({...r}));const g={};L.forEach(r=>{const k=r.date+'|'+rdvKey(r);(g[k]=g[k]||[]).push(r)});const out=[];
+ for(const list of Object.values(g)){const lg=list.filter(r=>r.source==='logiciel'&&r.statut!=='annule');
+  // doublons : rendez-vous saisis dans l'application, ou anciens rendez-vous du logiciel supprimés / recréés le même jour
+  const app=lg.length?list.filter(r=>r!==lg[0]&&(r.source!=='logiciel'||r.statut==='annule')&&!(r.source==='logiciel'&&lg.includes(r))):[];
+  if(!app.length){out.push(...list);continue}
+  const M=lg[0];out.push(...list.filter(r=>!app.includes(r)));
+  for(const A of app){if(A.statut!=='annule')M._dup=[...(M._dup||[]),A.id];if(A.statut!=='annule'&&(ST_RANK[A.statut]??0)>(ST_RANK[M.statut]??0))M.statut=A.statut;
+   M.pec=[...(M.pec||[]),...(A.pec||[])].sort((a,b)=>a.ts-b.ts);M.lots=[...new Set([...(M.lots||[]),...(A.lots||[])])];if(!M.soins&&A.soins)M.soins=A.soins;if(!M.note&&A.note)M.note=A.note;if(!M.praticien&&A.praticien)M.praticien=A.praticien}}
+ // Un membre ne soigne qu'un patient à la fois : seul son dernier « Prendre en charge » reste en cours
+ const last={};out.forEach(r=>(r.pec||[]).forEach(p=>{if(!last[p.by]||p.ts>last[p.by].ts)last[p.by]={ts:p.ts,id:r.id}}));
+ out.forEach(r=>{if(r.statut!=='encours'||!(r.pec||[]).length)return;const cur=r.pec.some(p=>last[p.by]?.id===r.id);if(cur)return;r.statut='termine';rdvFixStat(r,'termine')});
+ return out}
+function rdvFixStat(r,st){S._rdvFix=S._rdvFix||new Set();const k=r.id+st;if(S._rdvFix.has(k)||S.demo||!S.db||!(perm('rdv_gerer')||perm('rdv_jour')))return;S._rdvFix.add(k);
+ [r.id,...(r._dup||[])].forEach(id=>S.db.doc('rdv/'+id).update({statut:st,maj:Date.now(),par:S.uid}).catch(()=>{}))}
+const rdvIds=r=>[r.id,...(r?._dup||[])];
 /* ================= Coffre de documents du cabinet ================= */
 const COF_CATS=['Contrat','Assurance (RC professionnelle, locaux…)','Autorisation / licence','Garantie d\'équipement','Diplôme / inscription à l\'Ordre','Administratif / fiscal','Bail','Autre'];
 const cofState=x=>{if(!x.expire)return 'ok';const t=today();return x.expire<t?'expire':x.expire<=addDays(t,Number(x.rappel)||30)?'bientot':'ok'};
@@ -2625,7 +2643,7 @@ Acts.enableNotif=enableNotif;Acts.notifHide=()=>{ls.set('ns_notif_hide',1);refre
 function addSub(fn){S.dataSubs.push(fn)}
 function stopData(){(S.dataSubs||[]).forEach(f=>{try{f()}catch(e){}});S.dataSubs=[];S.subs.rdvSel?.();S.subs.rdvSel=null;S.dataStarted=false}
 function startData(){if(S.dataStarted||gated())return;S.dataStarted=true;const db=S.db;const w=e=>console.warn(e);startSite();
- if(perm('rdv_voir')||perm('rdv_jour')){addSub(db.collection('rdv').where('date','==',today()).onSnapshot(s=>{S.rdvToday=s.docs.map(d=>({id:d.id,...d.data()}));refresh('accueil')},w));addSub(db.collection('rdv').where('date','==',addDays(today(),1)).onSnapshot(s=>{S.rdvTomorrow=s.docs.map(d=>({id:d.id,...d.data()}));refresh('accueil')},w));subRdvSel()}
+ if(perm('rdv_voir')||perm('rdv_jour')){addSub(db.collection('rdv').where('date','==',today()).onSnapshot(s=>{S.rdvToday=rdvView(s.docs.map(d=>({id:d.id,...d.data()})));refresh('accueil')},w));addSub(db.collection('rdv').where('date','==',addDays(today(),1)).onSnapshot(s=>{S.rdvTomorrow=s.docs.map(d=>({id:d.id,...d.data()}));refresh('accueil')},w));subRdvSel()}
  if(perm('mod_groupes')){const acc={};myGroups().forEach(g=>addSub(db.collection('messages').where('groupe','==',g.id).orderBy('ts','desc').limit(20).onSnapshot(s=>{acc[g.id]=s.docs.map(d=>({id:d.id,...d.data()}));S.latest=Object.values(acc).flat().sort((a,b)=>b.ts-a.ts);refresh('accueil','groupes')},w)))}
  if(perm('mod_stock')||perm('labo_voir'))addSub(db.collection('stock').onSnapshot(s=>{S.stock=s.docs.map(d=>({id:d.id,...d.data()}));refresh('stock','accueil','labo')},w));
  if(perm('labo_voir'))addSub(db.collection('labo').orderBy('maj','desc').limit(500).onSnapshot(s=>{S.labo=s.docs.map(d=>({id:d.id,...d.data()}));refresh('labo','accueil','patients');const P=$('#labPhotos');if(P){const c=S.labo.find(x=>x.id===P.dataset.id);if(c)P.innerHTML=labPhotosHTML(c)}},w));
