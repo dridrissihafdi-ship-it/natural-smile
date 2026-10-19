@@ -2199,7 +2199,7 @@ function cofEdit(id){const x0=(S.coffre||[]).find(y=>y.id===id)||{titre:'',cat:C
  $('#cf-add',d).onclick=async()=>{const fs=await pickFiles('image/*,application/pdf',true);if(!fs.length)return;x.fichiers.push(...await uploadFiles(fs));$('#cf-f',d).innerHTML=thumbsHTML(x.fichiers,'cf')};
  $('#cf-f',d).onclick=e=>{const r=e.target.closest('[data-rm]');if(r){x.fichiers.splice(+r.dataset.i,1);$('#cf-f',d).innerHTML=thumbsHTML(x.fichiers,'cf')}}}
 /* ---- À surveiller : ouverture (8h30) et fermeture (2 h avant la fin de journée) ---- */
-const ROUTINE_DEF={ouv:'08:30',avant:120,
+const ROUTINE_DEF={ouv:'08:30',avant:120,apres:120,
  o:['Radio CBCT : allumer et vérifier le fonctionnement','Compresseur : mettre en marche',
   'Fauteuil — Salle 1 : vérifier l\'unit, la turbine, le micromoteur, le détartreur et l\'aspiration',
   'Fauteuil — Salle 2 : vérifier l\'unit, la turbine, le micromoteur, le détartreur et l\'aspiration',
@@ -2207,27 +2207,35 @@ const ROUTINE_DEF={ouv:'08:30',avant:120,
   'Stérilisation : allumer l\'autoclave, la thermosoudeuse et le bac à ultrasons',
   'Allumer les ordinateurs du cabinet, y compris l\'ordinateur du Docteur',
   'Allumer les écrans du cabinet, y compris l\'écran interactif du bureau du Docteur, et y afficher le logo du cabinet'],
- f:['Instruments des rendez-vous de demain : vérifier qu\'ils sont prêts','Prothèses des patients de demain : vérifier qu\'elles sont prêtes',
+ f:['Confirmer les rendez-vous des patients de demain','Instruments des rendez-vous de demain : vérifier qu\'ils sont prêts','Prothèses des patients de demain : vérifier qu\'elles sont prêtes',
   'Liste des travaux prothétiques : repérer les retards et relancer les patients qui n\'ont pas répondu',
   'Nettoyer les canalisations d\'aspiration de chaque fauteuil et les filtres','Éteindre les trois fauteuils','Éteindre le compresseur',
   'Éteindre les écrans et les ordinateurs','Éteindre l\'autoclave, la thermosoudeuse et le bac à ultrasons']};
-const routineCfg=()=>{const c=S.cfg?.routine||{};return {ouv:c.ouv||ROUTINE_DEF.ouv,avant:c.avant??ROUTINE_DEF.avant,o:(c.o||ROUTINE_DEF.o),f:(c.f||ROUTINE_DEF.f)}};
+const routineCfg=()=>{const c=S.cfg?.routine||{};return {ouv:c.ouv||ROUTINE_DEF.ouv,avant:c.avant??ROUTINE_DEF.avant,apres:c.apres??ROUTINE_DEF.apres,o:(c.o||ROUTINE_DEF.o),f:(c.f||ROUTINE_DEF.f)}};
 const rId=(k,t)=>k+'_'+Array.from(t).reduce((h,c)=>(h*31+c.charCodeAt(0))>>>0,7).toString(36);
-function routinePhase(){const sl=slotsOf(today());if(!sl.length)return {o:false,f:false};const C=routineCfg(),n=minOf(Date.now()),fin=toMin(sl[sl.length-1][1]);
- return {o:n>=toMin(C.ouv),f:n>=fin-Number(C.avant),fin}}
-function alertesCard(){if(!perm('mod_checklists'))return '';const ph=routinePhase();if(!ph.o&&!ph.f)return '';const C=routineCfg(),R=S.routine||{};
- const sec=(k,titre)=>{const L=C[k],done=R[k]||{};const todo=L.filter(t=>!done[rId(k,t)]);const n=L.length-todo.length;
-  if(!todo.length)return `<div class="row small" style="gap:8px;align-items:center;margin-top:10px"><span class="pill ok">${n}/${L.length}</span><span>${titre} : tout est fait.</span></div>`;
-  return `<div class="rt-sec"><div class="row" style="gap:8px;align-items:center;margin:4px 0 2px"><b>${titre}</b><span class="sp"></span><span class="pill warn">${n}/${L.length}</span></div>
-  <div class="list">${todo.map(t=>`<label class="li tache" style="cursor:pointer"><input type="checkbox" data-routine="${k}" data-id="${rId(k,t)}" ${S.demo?'disabled':''}><div class="grow"><div class="t">${esc(t)}</div></div></label>`).join('')}</div></div>`};
- return `<section class="card"><div class="card-h"><h3>À surveiller</h3><span class="sp"></span><button class="btn ghost" data-go="maintenance" style="padding-inline:10px">${ic('check')}Réalisées</button>${S.isOwner?`<button class="ib" data-act="routineEdit" aria-label="Modifier les listes">${ic('edit')}</button>`:''}</div>
- ${ph.f?sec('f','Fin de journée — avant de partir'):''}${ph.o?sec('o','Ouverture du cabinet — '+esc(routineCfg().ouv.replace(':','h'))):''}</section>`}
-document.addEventListener('change',e=>{const c=e.target.closest?.('[data-routine]');if(!c||S.demo)return;const k=c.dataset.routine,id=c.dataset.id,C=routineCfg();
- const FV=firebase.firestore.FieldValue;W(()=>S.db.doc('routine/'+today()).set({[k]:{[id]:c.checked?{by:S.uid,t:Date.now()}:FV.delete()},[k+'T']:C[k].map(t=>[rId(k,t),t]),maj:Date.now()},{merge:true}))});
+// Liste enregistrée dans le document du jour : [{id,t}] (ancien format [[id,t]] accepté)
+const rtList=(R,k)=>(R?.[k+'T']||[]).map(x=>Array.isArray(x)?x:[x.id,x.t]);
+const rtSnap=(C,k)=>C[k].map(t=>({id:rId(k,t),t}));
+// Phase affichée : ouverture de l'heure d'ouverture jusqu'au début de la fin de journée ; fin de journée jusqu'à 2 h après la fin du service.
+function routinePhase(){const sl=slotsOf(today());if(!sl.length)return {o:false,f:false};const C=routineCfg(),n=minOf(Date.now()),fin=toMin(sl[sl.length-1][1]),f0=fin-Number(C.avant);
+ return {o:n>=toMin(C.ouv)&&n<f0,f:n>=f0&&n<fin+Number(C.apres),fin}}
+function rtEnsure(ph){if(S.demo||!S.db||!perm('mod_checklists'))return;const R=S.routine||{},C=routineCfg();S._rtSnap=S._rtSnap||{};
+ for(const k of ['o','f']){if(!ph[k]||R[k+'T']?.length||S._rtSnap[k+today()])continue;S._rtSnap[k+today()]=1;
+  S.db.doc('routine/'+today()).set({[k+'T']:rtSnap(C,k),maj:Date.now()},{merge:true}).catch(e=>console.warn(e))}}
+function alertesCard(){if(!perm('mod_checklists'))return '';const ph=routinePhase();const k=ph.f?'f':ph.o?'o':null;if(!k)return '';rtEnsure(ph);
+ const C=routineCfg(),R=S.routine||{},L=C[k],done=R[k]||{};const todo=L.filter(t=>!done[rId(k,t)]);if(!todo.length)return '';
+ const n=L.length-todo.length,open=S.rtOpen===k+today(),show=open?todo:todo.slice(0,3);
+ const titre=k==='f'?'Fin de journée — avant de partir':'Ouverture du cabinet — '+esc(C.ouv.replace(':','h'));
+ return `<section class="card"><div class="card-h"><h3>À surveiller</h3><span class="sp"></span><span class="pill warn">${n}/${L.length}</span>${S.isOwner?`<button class="ib" data-act="routineEdit" aria-label="Modifier les listes">${ic('edit')}</button>`:''}</div>
+ <div class="small muted" style="margin:-4px 0 4px">${titre}</div>
+ <div class="list">${show.map(t=>`<label class="li tache" style="cursor:pointer"><input type="checkbox" data-routine="${k}" data-id="${rId(k,t)}" ${S.demo?'disabled':''}><div class="grow"><div class="t">${esc(t)}</div></div></label>`).join('')}</div>
+ <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">${todo.length>3?`<button class="btn ghost" data-act="rtToggle" data-k="${k}">${open?'Réduire':`Voir les ${todo.length-3} autre${todo.length-3>1?'s':''} tâche${todo.length-3>1?'s':''}`}</button>`:''}<span class="sp"></span><button class="btn ghost" data-go="maintenance">${ic('check')}Réalisées</button></div></section>`}
+document.addEventListener('change',e=>{const c=e.target.closest?.('[data-routine]');if(!c||S.demo)return;const k=c.dataset.routine,id=c.dataset.id,C=routineCfg();c.disabled=true;
+ const FV=firebase.firestore.FieldValue;W(()=>S.db.doc('routine/'+today()).set({[k]:{[id]:c.checked?{by:S.uid,t:Date.now()}:FV.delete()},[k+'T']:rtSnap(C,k),maj:Date.now()},{merge:true})).then(ok=>{if(!ok){c.checked=!c.checked;c.disabled=false}})});
 function routineEdit(){if(!S.isOwner)return;const C=routineCfg();openModal({title:'Listes « À surveiller »',ok:'Enregistrer',body:`<div class="small muted">Une ligne par point à vérifier. Les listes apparaissent dans l'accueil de toute l'équipe.</div>
- <div class="fgrid"><label class="f">Ouverture : afficher à partir de<input class="inp" type="time" name="ouv" value="${esc(C.ouv)}"></label><label class="f">Fin de journée : afficher avant la fin (minutes)<input class="inp" type="number" min="15" max="480" step="15" name="avant" value="${esc(C.avant)}"></label></div>
- <label class="f">Ouverture du cabinet<textarea class="inp" name="o" rows="9">${esc(C.o.join('\n'))}</textarea></label><label class="f">Fin de journée<textarea class="inp" name="f" rows="9">${esc(C.f.join('\n'))}</textarea></label>`,
- onOk:f=>{const L=x=>String(x||'').split('\n').map(t=>t.trim()).filter(Boolean);return W(()=>S.db.doc('cfg/routine').set({ouv:f.ouv||'08:30',avant:Math.max(15,Number(f.avant)||120),o:L(f.o),f:L(f.f),maj:Date.now()}),'Listes enregistrées')}})}
+ <div class="fgrid"><label class="f">Ouverture : afficher à partir de<input class="inp" type="time" name="ouv" value="${esc(C.ouv)}"></label><label class="f">Fin de journée : afficher avant la fin (minutes)<input class="inp" type="number" min="15" max="480" step="15" name="avant" value="${esc(C.avant)}"></label><label class="f">Fin de journée : masquer après la fin (minutes)<input class="inp" type="number" min="0" max="480" step="15" name="apres" value="${esc(C.apres)}"></label></div>
+ <label class="f">Ouverture du cabinet<textarea class="inp" name="o" rows="9">${esc(C.o.join('\n'))}</textarea></label><label class="f">Fin de journée<textarea class="inp" name="f" rows="10">${esc(C.f.join('\n'))}</textarea></label>`,
+ onOk:f=>{const L=x=>String(x||'').split('\n').map(t=>t.trim()).filter(Boolean);return W(()=>S.db.doc('cfg/routine').set({ouv:f.ouv||'08:30',avant:Math.max(15,Number(f.avant)||120),apres:Math.max(0,Number(f.apres)||0),o:L(f.o),f:L(f.f),maj:Date.now()}),'Listes enregistrées')}})}
 setInterval(()=>{if(S.view!=='accueil')return;const p=JSON.stringify(routinePhase());if(S._rph!==undefined&&S._rph!==p)refresh('accueil');S._rph=p},60000);
 
 /* ================= Tableau de bord (statistiques) ================= */
@@ -2324,13 +2332,13 @@ async function loadRecLog(o){const d=S.reDate||today(),m=d.slice(0,7),y=d.slice(
 async function routineMaint(fetch){const el=$('#rtM');if(!el)return;const d=S.rtDate||today(),isT=d===today();let R;
  if(isT)R=S.routine||{};else{if(fetch||S._rtD?.d!==d){el.innerHTML='<div class="small muted">Chargement…</div>';try{const x=await S.db.doc('routine/'+d).get();S._rtD={d,R:x.exists?x.data():null}}catch(e){S._rtD={d,R:null}}}R=S._rtD.R;
   if(!R){el.innerHTML=`<div class="small muted">Aucune vérification enregistrée le ${esc(fmtDate(d,{weekday:'long',day:'numeric',month:'long'}))}.</div>`;return}}
- const C=routineCfg();const items=k=>isT?C[k].map(t=>[rId(k,t),t]):(R[k+'T']||[]);
+ const C=routineCfg();const items=k=>isT?C[k].map(t=>[rId(k,t),t]):rtList(R,k);
  el.innerHTML=[['o','Ouverture du cabinet'],['f','Fin de journée']].map(([k,titre])=>{const I=items(k),D=R[k]||{};const done=I.filter(([id])=>D[id]).sort((a,b)=>D[a[0]].t-D[b[0]].t),todo=I.filter(([id])=>!D[id]);if(!I.length)return '';
   return `<div class="stack" style="gap:6px"><div class="row" style="gap:8px;align-items:center"><b>${titre}</b><span class="sp"></span><span class="pill ${todo.length?'warn':'ok'}">${done.length}/${I.length}</span></div>
   ${todo.length?`<div class="small" style="color:var(--bad);font-weight:600">${isT?'À faire':'Non fait'} (${todo.length})</div><div class="list">${todo.map(([id,t])=>isT?`<label class="li tache" style="cursor:pointer"><input type="checkbox" data-routine="${k}" data-id="${esc(id)}" ${S.demo?'disabled':''}><div class="grow"><div class="t">${esc(t)}</div></div></label>`:`<div class="li"><div class="grow"><div class="t">${esc(t)}</div></div></div>`).join('')}</div>`:''}
   ${done.length?`<div class="small" style="color:#2f6b45;font-weight:600">Réalisées (${done.length})</div><div class="list">${done.map(([id,t])=>{const x=D[id];return `<div class="li"><span class="gold">${ic('check')}</span><div class="grow"><div class="t">${esc(t)}</div><div class="s">${esc(nameOf(x.by))} · ${esc(new Date(x.t).toLocaleString('fr-FR',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}</div></div>${isT&&!S.demo&&(S.isOwner||x.by===S.uid)?`<button class="btn ghost" data-act="rtUndo" data-k="${k}" data-id="${esc(id)}" style="padding-inline:10px">Annuler</button>`:''}</div>`}).join('')}</div>`:''}</div>`}).join('<hr style="border:0;border-top:1px solid var(--line);margin:4px 0">')}
 async function routineJournal(){const el=$('#rtJ');if(!el)return;try{const q=await S.db.collection('routine').orderBy('maj','desc').limit(40).get();
- const L=q.docs.map(x=>({d:x.id,...x.data()})).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,30);const c=(R,k)=>{const T=R[k+'T']||[],D=R[k]||{};return [T.filter(([id])=>D[id]).length,T.length]};
+ const L=q.docs.map(x=>({d:x.id,...x.data()})).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,30);const c=(R,k)=>{const T=rtList(R,k),D=R[k]||{};return [T.filter(([id])=>D[id]).length,T.length]};
  el.innerHTML=L.length?`<div class="list">${L.map(R=>{const o=c(R,'o'),f=c(R,'f');const pl=([a,b],l)=>b?`<span class="pill ${a===b?'ok':'bad'}">${l} ${a}/${b}</span>`:'';return `<div class="li" style="cursor:pointer" data-act="rtPick" data-d="${esc(R.d)}"><div class="grow"><div class="t">${esc(capFirst(fmtDate(R.d,{weekday:'long',day:'numeric',month:'long'})))}</div></div>${pl(o,'Ouverture')}${pl(f,'Fin')}</div>`}).join('')}</div>`:'Aucune vérification enregistrée pour le moment.'}
  catch(e){console.warn(e);el.textContent='Journal indisponible.'}}
 /* ---- Rapports de fin de journée (administrateur) ---- */
@@ -2540,7 +2548,7 @@ const Acts={mfaOn,mfaOff,xp:a=>xp(a.dataset.k),theme:a=>{ls.set('ns_theme',a.dat
  stFilter:a=>{S.stockFilter=a.dataset.k;S.stockQ='';const q=$('#stq');if(q)q.value='';stockUpdate();window.scrollTo(0,0)},stockCatalog:a=>stockCatalog(a.dataset.k),ptSetCab,ptRayon:()=>{const r=Math.max(5,Math.min(2000,Number($('#ptRayon')?.value)||10));W(()=>S.db.doc('cfg/cabinet').update({rayon:r}),'Rayon : '+r+' m')},scanIn:()=>{S.scanMode='in';scanModal()},scanOut:()=>{S.scanMode='out';scanModal()},stockLow:()=>{S.stockFilter='bas';go('stock')},orderList,
  caTab:a=>{S.caisseTab=a.dataset.t;go('caisse')},caActivate,reLoad:loadRecettes,
  rePick:a=>{S.reDate=a.dataset.d;const i=$('#reDate');if(i)i.value=a.dataset.d;loadRecettes();window.scrollTo(0,0)},
- caFix:a=>caFix(a.dataset.id),rtPick:a=>{S.rtDate=a.dataset.d;const i=$('#rtDate');if(i)i.value=a.dataset.d;routineMaint(true);window.scrollTo(0,0)},rtUndo:a=>{const k=a.dataset.k;W(()=>S.db.doc('routine/'+today()).set({[k]:{[a.dataset.id]:firebase.firestore.FieldValue.delete()},maj:Date.now()},{merge:true}),'Annulé')},routineEdit,recPat:a=>{go('patients');openPatient(a.dataset.id)},reSrc:a=>{S.reSrc=a.dataset.k;ls.set('ns_resrc',S.reSrc);mountRecettes()},reYear:async a=>{a.disabled=true;a.textContent='Déchiffrement de l\'année…';const y=(S.reDate||today()).slice(0,4);try{const L=await fetchRecRange(y+'-01-01',y+'-12-31');const pm={};L.forEach(x=>pm[x.date.slice(0,7)]=(pm[x.date.slice(0,7)]||0)+(Number(x.montant)||0));S.reYear={y,n:L.length,total:L.reduce((t,x)=>t+(Number(x.montant)||0),0),mois:Object.entries(pm).sort()};loadRecettes()}catch(e){toast('Calcul impossible.','err');a.disabled=false}},reDel:async a=>{if(!await ask('Supprimer cet encaissement ?','Supprimer'))return;if(await W(()=>S.db.doc(`recettes/${a.dataset.u}/e/${a.dataset.id}`).delete(),'Encaissement supprimé'))loadRecettes()},
+ caFix:a=>caFix(a.dataset.id),rtPick:a=>{S.rtDate=a.dataset.d;const i=$('#rtDate');if(i)i.value=a.dataset.d;routineMaint(true);window.scrollTo(0,0)},rtToggle:a=>{const v=a.dataset.k+today();S.rtOpen=S.rtOpen===v?null:v;refresh('accueil')},rtUndo:a=>{const k=a.dataset.k;W(()=>S.db.doc('routine/'+today()).set({[k]:{[a.dataset.id]:firebase.firestore.FieldValue.delete()},maj:Date.now()},{merge:true}),'Annulé')},routineEdit,recPat:a=>{go('patients');openPatient(a.dataset.id)},reSrc:a=>{S.reSrc=a.dataset.k;ls.set('ns_resrc',S.reSrc);mountRecettes()},reYear:async a=>{a.disabled=true;a.textContent='Déchiffrement de l\'année…';const y=(S.reDate||today()).slice(0,4);try{const L=await fetchRecRange(y+'-01-01',y+'-12-31');const pm={};L.forEach(x=>pm[x.date.slice(0,7)]=(pm[x.date.slice(0,7)]||0)+(Number(x.montant)||0));S.reYear={y,n:L.length,total:L.reduce((t,x)=>t+(Number(x.montant)||0),0),mois:Object.entries(pm).sort()};loadRecettes()}catch(e){toast('Calcul impossible.','err');a.disabled=false}},reDel:async a=>{if(!await ask('Supprimer cet encaissement ?','Supprimer'))return;if(await W(()=>S.db.doc(`recettes/${a.dataset.u}/e/${a.dataset.id}`).delete(),'Encaissement supprimé'))loadRecettes()},
  ptLoad:loadTeam,regEdit,regAccept:()=>W(()=>S.db.doc('annuaire/'+S.uid).update({reglementLu:S.cfg.reglement.version}),'Merci, acceptation enregistrée'),
  grpEdit:a=>grpEdit(a.dataset.id),
  memPerms:a=>memPerms(a.dataset.u),histImport:()=>$('#histfile').click(),histAll:()=>{S.histAll=true;updatePatient()},rdvAll:()=>{S.rdvAll=true;updatePatient()},patImport:()=>$('#impfile').click(),syncAgenda:a=>syncAgenda(a),authMode:a=>{S.authMode=a.dataset.m;go('attente')},
