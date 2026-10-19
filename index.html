@@ -195,7 +195,9 @@ td.r,th.r{text-align:right}
 .rdv .h small{display:block;color:var(--muted);font-size:.74rem;font-family:var(--f-body);font-weight:400}
 .rdv .grow{min-width:0;cursor:pointer}
 .rdv{border-left:4px solid var(--tc,transparent);padding-left:10px!important}
-.stag{display:inline-block;font-size:.7rem;font-weight:600;padding:1px 8px;border-radius:9px;color:#fff;background:var(--tc);vertical-align:2px;margin-left:4px}
+.rdv.st-encours{background:rgba(217,83,79,.13);border-radius:12px}.rdv.st-termine{background:rgba(46,139,87,.12);border-radius:12px}
+.sel-pill.st-encours{background:#c0392b;color:#fff;border-color:#c0392b;font-weight:600}.sel-pill.st-termine{background:rgba(46,139,87,.18);border-color:rgba(46,139,87,.4)}
+.stag{display:inline-block;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15);font-size:.7rem;font-weight:600;padding:1px 8px;border-radius:9px;color:#fff;background:var(--tc);vertical-align:2px;margin-left:4px}
 .legend{display:flex;gap:6px 12px;overflow-x:auto;scrollbar-width:none;padding:2px 0;font-size:.74rem;color:var(--muted);white-space:nowrap}.legend::-webkit-scrollbar{display:none}
 .legend .lg{display:inline-flex;align-items:center;gap:5px}.legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
 .rdv{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;transition:background .2s}.rdv.pressing{background:var(--accent-soft);border-radius:12px}
@@ -467,10 +469,13 @@ const DEF_SOINS=[{id:'consult',nom:'Consultation / contrôle',c:'#6B8FB5'},{id:'
  {id:'chir',nom:'Chirurgie / extraction',c:'#C0392B',chir:true},{id:'implant',nom:'Implantologie',c:'#7A1F3D',chir:true},{id:'ortho',nom:'Orthodontie',c:'#2E8B57'},
  {id:'align',nom:'Aligneurs',c:'#3CB371'},{id:'esth',nom:'Esthétique / blanchiment',c:'#E07BA6'},{id:'pedo',nom:'Pédodontie',c:'#F0A030'}];
 const soinTypes=()=>(S.cfg?.soins?.liste?.length?S.cfg.soins.liste:DEF_SOINS);
-const soinOf=r=>soinTypes().find(t=>t.id===r?.type)||null;
-const soinTag=r=>{const t=soinOf(r);return t?` <span class="stag" style="--tc:${esc(t.c)}">${esc(t.nom)}</span>`:''};
+const soinType=r=>soinTypes().find(t=>t.id===r?.type)||null;
+// Rendez-vous du logiciel : on affiche le soin et la couleur choisis dans le logiciel du cabinet
+const soinOf=r=>{const t=soinType(r);if(r?.label)return {id:'lg',nom:r.label,c:r.labelC||t?.c||'#8a8a8a',chir:!!t?.chir};return t};
+const txtOn=c=>{const m=/^#?([0-9a-f]{6})$/i.exec(c||'');if(!m)return '#fff';const v=parseInt(m[1],16),l=(0.299*(v>>16)+0.587*((v>>8)&255)+0.114*(v&255));return l>160?'#2b2b2b':'#fff'};
+const soinTag=r=>{const t=soinOf(r);return t?` <span class="stag" style="--tc:${esc(t.c)};color:${txtOn(t.c)}">${esc(t.nom)}</span>`:''};
 const rdvLong=r=>Number(r.duree)>60||!!soinOf(r)?.chir;
-function soinLegend(){return soinTypes().map(t=>`<span class="lg"><i style="background:${esc(t.c)}"></i>${esc(t.nom)}</span>`).join('')}
+function soinLegend(list){const L=(list||[]).map(soinOf).filter(Boolean);if(L.length){const u=new Map();L.forEach(t=>u.set(t.nom,t));return [...u.values()].map(t=>`<span class="lg"><i style="background:${esc(t.c)};box-shadow:inset 0 0 0 1px rgba(0,0,0,.2)"></i>${esc(t.nom)}</span>`).join('')}return soinTypes().map(t=>`<span class="lg"><i style="background:${esc(t.c)}"></i>${esc(t.nom)}</span>`).join('')}
 function soinTypesEdit(){if(!S.isOwner)return;const L=soinTypes().map(t=>({...t}));
  const row=(t,k)=>`<div class="row st-row" style="gap:8px;align-items:center"><input type="color" class="inp" name="c${k}" value="${esc(t.c)}" style="width:46px;padding:2px;height:40px"><input class="inp" name="n${k}" value="${esc(t.nom)}" style="flex:1;min-width:120px" placeholder="Nom du soin"><label class="small" style="display:flex;gap:4px;align-items:center;white-space:nowrap"><input type="checkbox" name="x${k}" ${t.chir?'checked':''}>Chirurgie</label><input type="hidden" name="i${k}" value="${esc(t.id)}"></div>`;
  const d=openModal({title:'Types de soins',body:`<div class="small muted">Chaque rendez-vous doit avoir un type. La couleur s'affiche dans l'agenda. Les types « Chirurgie » déclenchent un rappel la veille, comme les séances de plus d'une heure. Videz un nom pour supprimer le type.</div>
@@ -478,8 +483,8 @@ function soinTypesEdit(){if(!S.isOwner)return;const L=soinTypes().map(t=>({...t}
   onOk:f=>{const out=[];for(let k=0;k<200;k++){if(!(('n'+k) in f))continue;const nom=String(f['n'+k]).trim();if(!nom)continue;out.push({id:f['i'+k]||('t'+Date.now().toString(36)+k),nom,c:f['c'+k]||'#999999',...(f['x'+k]?{chir:true}:{})})}
    if(!out.length){toast('Gardez au moins un type.','err');return false}return W(()=>S.db.doc('cfg/soins').set({liste:out}),'Types de soins enregistrés')}});
  let n=L.length;$('#stAdd',d).onclick=()=>{$('#stList',d).insertAdjacentHTML('beforeend',row({id:'',nom:'',c:'#888888'},n++))}}
-const STATUTS={prevu:'Prévu',confirme:'Confirmé',arrive:'En salle d\'attente',encours:'En soin',termine:'Terminé',absent:'Absent',annule:'Annulé'};
-const STATUT_CLS={prevu:'',confirme:'acc',arrive:'warn',encours:'warn',termine:'ok',absent:'bad',annule:'bad'};
+const STATUTS={prevu:'Prévu',confirme:'Confirmé',arrive:'En salle d\'attente',encours:'En cours de soins',termine:'Terminé',absent:'Absent',annule:'Annulé'};
+const STATUT_CLS={prevu:'',confirme:'acc',arrive:'warn',encours:'bad',termine:'ok',absent:'bad',annule:'bad'};
 const ACTES=['Consultation','Urgence','Détartrage','Composite','Traitement endodontique','Extraction','Pose d\'implant','Empreinte prothèse','Essayage prothèse','Pose couronne / bridge','Séance aligneurs','Contrôle orthodontie','Pose appareil orthodontique','Blanchiment','Contrôle post-opératoire'];
 const MODES={especes:'Espèces',carte:'Carte bancaire',cheque:'Chèque',virement:'Virement'};
 const LAB_SECTIONS=[
@@ -876,11 +881,11 @@ Views.agenda={
   const AD=$('#agDays');if(AD)AD.innerHTML=Array.from({length:7},(_,i)=>{const x=addDays(mon,i);const o=new Date(x+'T12:00:00');
    return `<button class="day ${x===today()?'today':''}" aria-pressed="${x===d}" data-act="agPick" data-d="${x}">${o.toLocaleDateString('fr-FR',{weekday:'short'}).replace('.','')}<b>${o.getDate()}</b></button>`}).join('');
   const list=[...S.rdvSel].sort((a,b)=>(a.heure||'').localeCompare(b.heure||''));
-  const LG=$('#agLegend');if(LG)LG.innerHTML=soinLegend()+libreBanner(list);
-  $('#agList').innerHTML=list.length?list.map(r=>`<div data-lp="${esc(r.id)}" style="--tc:${esc(soinOf(r)?.c||'transparent')}" class="rdv ${['annule','absent'].includes(r.statut)?'dim':''}">
+  const LG=$('#agLegend');if(LG)LG.innerHTML=soinLegend(list)+libreBanner(list);
+  $('#agList').innerHTML=list.length?list.map(r=>`<div data-lp="${esc(r.id)}" style="--tc:${esc(soinOf(r)?.c||'transparent')}" class="rdv st-${esc(r.statut||'prevu')} ${['annule','absent'].includes(r.statut)?'dim':''}">
     <div class="h">${esc(r.heure||'--:--')}<small>${esc(r.duree||30)} min</small></div>
     <div class="grow" data-act="${dayOnly()?'rdvMenu':'rdvEdit'}" data-id="${esc(r.id)}"><div style="font-weight:600">${esc(r.patient||'Patient')}${soinTag(r)}</div><div class="small muted">${esc([r.acte,r.praticien,r.tel].filter(Boolean).join(' · '))}</div>${r.soins?.texte?`<div class="small"><b>Soins :</b> ${esc(r.soins.texte)}</div>`:''}${(r.pec||[]).length?`<div class="small muted">Pris en charge : ${esc(r.pec.map(x=>nameOf(x.by)+' '+hm(x.ts)).join(', '))}</div>`:''}${r.note?`<div class="small muted">${esc(r.note)}</div>`:''}</div>
-    <div class="rdv-side">${r.patientId&&perm('pat_voir')?`<button class="ib" data-act="openPat" data-id="${esc(r.patientId)}" aria-label="Ouvrir la fiche patient" title="Fiche patient">${ic('folder')}</button>`:''}<select class="sel-pill" aria-label="Statut" data-rdvstat="${esc(r.id)}" ${perm('rdv_gerer')||perm('rdv_jour')?'':'disabled'}>${Object.entries(STATUTS).map(([k,v])=>`<option value="${k}" ${r.statut===k?'selected':''}>${esc(v)}</option>`).join('')}</select></div>
+    <div class="rdv-side">${r.patientId&&perm('pat_voir')?`<button class="ib" data-act="openPat" data-id="${esc(r.patientId)}" aria-label="Ouvrir la fiche patient" title="Fiche patient">${ic('folder')}</button>`:''}<select class="sel-pill st-${esc(r.statut||'prevu')}" aria-label="Statut" data-rdvstat="${esc(r.id)}" ${perm('rdv_gerer')||perm('rdv_jour')?'':'disabled'}>${Object.entries(STATUTS).map(([k,v])=>`<option value="${k}" ${r.statut===k?'selected':''}>${esc(v)}</option>`).join('')}</select></div>
    </div>`).join(''):`<div class="empty"><strong>Aucun rendez-vous ce jour</strong>${perm('rdv_gerer')?'Ajoutez le premier avec le bouton « Rendez-vous ».':''}</div>`;
   $$('[data-rdvstat]').forEach(s=>s.onchange=async()=>{if(await W(()=>S.db.doc('rdv/'+s.dataset.rdvstat).update({statut:s.value,maj:Date.now(),par:S.uid}),'Statut : '+STATUTS[s.value])){const r=S.rdvSel.find(x=>x.id===s.dataset.rdvstat);if(r)patDates(r.patientId,r.date,s.value)}});
  }};
@@ -2193,7 +2198,10 @@ function pecModal(r){const C=(S.steril||[]).filter(c=>c.date>=addDays(today(),-1
    if(S.steril?.length){const known=new Map((S.steril||[]).map(c=>[lotNorm(c.lot),c]));const bad=L.filter(l=>known.get(l)?.resultat==='non_conforme');if(bad.length){toast('Lot NON CONFORME : '+bad.join(', ')+'. Ces instruments ne doivent pas être utilisés.','err');return false}
     const unk=L.filter(l=>!known.has(l));if(unk.length&&!await ask(`Numéro inconnu : ${unk.join(', ')}. Aucun cycle de stérilisation n'est enregistré avec ce numéro. Continuer quand même ?`,'Continuer'))return false}
    const data={pec:firebase.firestore.FieldValue.arrayUnion({by:S.uid,ts:Date.now(),lots:L}),lots:firebase.firestore.FieldValue.arrayUnion(...L),maj:Date.now(),par:S.uid};if(['prevu','confirme','arrive'].includes(r.statut||'prevu'))data.statut='encours';
-   return W(()=>S.db.doc('rdv/'+r.id).update(data),'Patient pris en charge')}});
+   const ok=await W(()=>S.db.doc('rdv/'+r.id).update(data),'Patient pris en charge');
+   if(ok){const prev=[...(S.rdvToday||[]),...(S.rdvSel||[])].filter((x,i,a)=>x.id!==r.id&&x.statut==='encours'&&a.findIndex(y=>y.id===x.id)===i&&(x.pec||[]).length&&x.pec[x.pec.length-1].by===S.uid);
+    for(const x of prev)S.db.doc('rdv/'+x.id).update({statut:'termine',maj:Date.now(),par:S.uid}).catch(e=>console.warn(e))}
+   return ok}});
  d.querySelectorAll('[data-lot]').forEach(b=>b.onclick=()=>{const i=$('#pc-l',d);const v=new Set(i.value.split(/[\s,;]+/).filter(Boolean));v.has(b.dataset.lot)?v.delete(b.dataset.lot):v.add(b.dataset.lot);i.value=[...v].join(', ');b.setAttribute('aria-pressed',v.has(b.dataset.lot))});setTimeout(()=>$('#pc-l',d)?.focus(),80)}
 /* ================= Coffre de documents du cabinet ================= */
 const COF_CATS=['Contrat','Assurance (RC professionnelle, locaux…)','Autorisation / licence','Garantie d\'équipement','Diplôme / inscription à l\'Ordre','Administratif / fiscal','Bail','Autre'];
