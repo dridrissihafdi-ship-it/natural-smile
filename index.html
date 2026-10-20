@@ -1498,7 +1498,7 @@ function orderList(){const lab=S.stockZone==='labo';const low=zoneItems().filter
 /* ---- Laboratoire ---- */
 const LAB={
  fixe:{nom:'Prothèse fixe',court:'Fixe',ic:'crown',echeance:'Livraison prévue',
-  steps:[['empreinte','Empreinte reçue'],['cao','Modélisation CAO'],['validation','Validation du design'],['fabrication','Fraisage ou impression'],['finition','Céramique et maquillage'],['essayage','Essayage'],['livre','Livré']],
+  steps:[['empreinte','Empreinte numérique','cab'],['reception','Réception de l\'empreinte','lab'],['design','Validation du design','cab'],['impression','Impression du provisoire','lab'],['valprov','Validation du provisoire','cab'],['frittage','Frittage et maquillage','lab'],['livraison','Livraison','lab']],
   travaux:['Couronne zircone','Couronne zircone stratifiée','Couronne disilicate','Couronne céramo-métallique','Couronne sur implant','Bridge zircone','Bridge sur implants','Inlay / onlay','Facette','Inlay-core','Provisoire','Guide chirurgical'],
   materiaux:['Zircone monolithique','Zircone multicouche','Disilicate de lithium','Céramo-métallique','PMMA','Résine imprimée','Titane']},
  amovible:{nom:'Prothèse amovible',court:'Amovible',ic:'denture',echeance:'Livraison prévue',
@@ -1515,8 +1515,15 @@ const LAB={
   materiaux:['Zircone','Disilicate de lithium','Céramo-métallique','Résine','Cobalt-chrome']}
 };
 const TEINTES=['BL1','BL2','A1','A2','A3','A3,5','A4','B1','B2','B3','B4','C1','C2','C3','C4','D2','D3','D4'];
-const labDone=c=>{const st=LAB[c.section]?.steps||[];return c.statut===st[st.length-1]?.[0]};
-const labStepIdx=c=>Math.max(0,(LAB[c.section]?.steps||[]).findIndex(x=>x[0]===c.statut));
+// Anciennes étapes de la prothèse fixe → nouveau circuit cabinet / laboratoire
+const LAB_ALIAS={fixe:{cao:'reception',validation:'design',fabrication:'impression',finition:'frittage',essayage:'frittage',livre:'livraison'}};
+const labSt=c=>(LAB_ALIAS[c.section]||{})[c.statut]||c.statut;
+const labDone=c=>{const st=LAB[c.section]?.steps||[];return labSt(c)===st[st.length-1]?.[0]};
+const labStepIdx=c=>Math.max(0,(LAB[c.section]?.steps||[]).findIndex(x=>x[0]===labSt(c)));
+// Qui fait l'étape : « lab » = prothésiste, « cab » = cabinet (assistantes, Docteur)
+const labSide=()=>S.isOwner?'all':roleOf(S.uid)==='prothesiste'?'lab':'cab';
+const labCanDo=step=>!step?.[2]||labSide()==='all'||labSide()===step[2];
+const LAB_WHO={lab:'Laboratoire',cab:'Cabinet'};
 const labLate=c=>!labDone(c)&&c.echeance&&c.echeance<today();
 function labDue(c){if(labDone(c))return '<span class="pill ok">Terminé</span>';if(!c.echeance)return '';
  const d=c.echeance,t=today();const lbl=d===t?'Aujourd\'hui':d===addDays(t,1)?'Demain':capFirst(fmtDate(d,{weekday:'short',day:'numeric',month:'short'}));
@@ -1531,7 +1538,7 @@ Views.labo={
   if(tab==='stock'){S.stockZone='labo';stockMount(B,true);return}
   B.innerHTML=`<div class="stack"><div class="row"><input class="inp" id="labq" type="search" placeholder="Patient, travail, teinte${tab==='externe'?', laboratoire':''}" style="flex:1;min-width:180px" value="${esc(S.labQ||'')}" aria-label="Rechercher un travail"></div>
    <div class="chips" id="labChips"></div><div id="labList" class="cases"></div></div>
-   ${perm('labo_gerer')?`<button class="btn pri big fab" data-act="labNew">${ic('plus')}${tab==='externe'?'Envoi':'Travail'}</button>`:''}`;
+   ${perm('labo_gerer')&&labSide()!=='lab'?`<button class="btn pri big fab" data-act="labNew">${ic('plus')}${tab==='externe'?'Envoi':'Travail'}</button>`:''}`;
   $('#labq').addEventListener('input',e=>{S.labQ=e.target.value;Views.labo.update()})},
  update(){const tab=S.labTab||'fixe';const all=S.labo;const enc=all.filter(c=>!labDone(c));
   const K=$('#labKpis');if(K){const late=enc.filter(labLate).length,week=enc.filter(c=>c.echeance&&c.echeance>=today()&&c.echeance<=addDays(today(),6)).length;
@@ -1551,7 +1558,7 @@ Views.labo={
     <div class="s">${esc([c.travail,c.dents?'dent '+c.dents:'',c.teinte?'teinte '+c.teinte:'',c.materiau,tab==='externe'&&c.laboExt?c.laboExt:''].filter(Boolean).join(', '))}</div></div>${alEnCours(c)&&labDone(c)?'<span class="pill ok">Série livrée</span>':labDue(c)}</div>
     ${alProgress(c)}
     <div class="steps" aria-label="Étape ${i+1} sur ${st.length}">${st.map((x,j)=>`<i class="${j<=i?'on':''}" title="${esc(x[1])}"></i>`).join('')}</div>
-    <div class="case-foot"><span class="small"><b>${esc(st[i][1])}</b>${c.photos?.length?`<span class="muted">, ${c.photos.length} photo${c.photos.length>1?'s':''}</span>`:''}</span><span class="sp"></span>${can&&nx?`<button class="btn ghost" data-act="labNext" data-id="${esc(c.id)}">${esc(nx[1])}${ic('right')}</button>`:''}${can&&!nx&&alEnCours(c)?`<button class="btn pri" data-act="alRemis" data-id="${esc(c.id)}">${ic('check')}Aligneur ${(Number(c.alActuel)||0)+1} remis</button>`:''}</div></article>`}).join('')
+    <div class="case-foot"><span class="small"><b>${esc(st[i][1])}</b>${c.photos?.length?`<span class="muted">, ${c.photos.length} photo${c.photos.length>1?'s':''}</span>`:''}</span><span class="sp"></span>${can&&nx&&labCanDo(nx)?`<button class="btn ${nx[2]&&labSide()===nx[2]?'pri':'ghost'}" data-act="labNext" data-id="${esc(c.id)}">${esc(nx[1])}${ic('right')}</button>`:''}${nx&&nx[2]&&!labCanDo(nx)?`<span class="pill ${nx[2]==='lab'?'warn':'acc'}">À faire : ${esc(LAB_WHO[nx[2]])} — ${esc(nx[1])}</span>`:''}${can&&!nx&&alEnCours(c)?`<button class="btn pri" data-act="alRemis" data-id="${esc(c.id)}">${ic('check')}Aligneur ${(Number(c.alActuel)||0)+1} remis</button>`:''}</div></article>`}).join('')
    :`<div class="card"><div class="empty"><strong>${f==='encours'?'Aucun travail en cours':f==='retard'?'Aucun retard':f==='suivi'?'Aucun traitement par aligneurs en cours':f==='remettre'?'Aucun aligneur à remettre dans les 3 jours':'Aucun travail terminé'}</strong>${f==='encours'&&can?`Ajoutez ${tab==='externe'?'un envoi vers un laboratoire extérieur':'un travail'} avec le bouton en bas de l'écran.`:''}</div></div>`}};
 async function labSetStep(c,statut){const steps=LAB[c.section].steps;const hist=[...(c.historique||[]),{s:statut,ts:Date.now(),by:S.uid}].slice(-40);
  return W(()=>S.db.doc('labo/'+c.id).update({statut,historique:hist,maj:Date.now(),par:S.uid}),statut===steps[steps.length-1][0]?'Travail terminé':'Étape : '+steps.find(x=>x[0]===statut)[1])}
@@ -1588,22 +1595,22 @@ function labModal(c){const tab=c?.section||S.labTab||'fixe';const sec=LAB[tab];c
    <div class="fgrid"><label class="f">Dernier aligneur remis (n°)<input class="inp" type="number" min="0" name="alActuel" id="lb-alact" value="${esc(c.alActuel||0)}"></label><label class="f">Changement tous les (jours)<input class="inp" type="number" min="1" max="60" name="alIntervalle" id="lb-aliv" value="${esc(c.alIntervalle||14)}"></label></div>
    <label class="f">Remise du prochain aligneur le<input class="inp" type="date" name="alProchain" id="lb-alpro" value="${esc(c.alProchain||'')}"></label>
    <div class="small muted">Un rappel s'affiche à l'accueil et dans le laboratoire 3 jours avant la date. Utilisez « Aligneur remis » sur la fiche pour avancer automatiquement.</div></section>`:''}
-  <label class="f">Étape<select class="inp" name="statut" id="lb-statut">${sec.steps.map(([k,l])=>`<option value="${k}" ${c.statut===k?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
+  <label class="f">Étape<select class="inp" name="statut" id="lb-statut" ${S.isOwner||(!c.id&&!sec.steps[0][2])?'':'disabled'}>${sec.steps.map(([k,l,w])=>`<option value="${k}" ${labSt(c)===k?'selected':''}>${esc(l)}${w?' ('+LAB_WHO[w]+')':''}</option>`).join('')}</select>${S.isOwner?'':`<span class="small muted">L'étape avance avec le bouton de la fiche, par le cabinet ou le laboratoire selon l'étape.</span>`}</label>
   <label class="f">Notes pour le prothésiste<textarea class="inp" name="notes" id="lb-notes" rows="3" style="min-height:70px" placeholder="Forme, caractérisation, points de contact, espace prothétique…">${esc(c.notes||'')}</textarea></label></fieldset>
   ${c.id&&alTrack(c)?`<section class="stack" style="gap:8px"><h3>Aligneurs</h3>${alProgress(c)}${alEnCours(c)&&!ro?`<button type="button" class="btn pri" data-act="alRemis" data-id="${esc(c.id)}" style="align-self:flex-start">${ic('check')}Aligneur n° ${(Number(c.alActuel)||0)+1} remis aujourd'hui</button>`:''}${(c.alHist||[]).length?`<div class="small muted">${[...c.alHist].reverse().slice(0,6).map(h=>`n° ${h.n} le ${esc(fmtDate(h.d,{day:'numeric',month:'short'}))}`).join(' · ')}</div>`:''}</section>`:''}
   ${c.id?`<section class="stack" style="gap:10px"><h3>Photos</h3><div class="stack" style="gap:14px" id="labPhotos" data-id="${esc(c.id)}">${labPhotosHTML(c)}</div></section>
-  <section class="stack" style="gap:8px"><h3>Partager</h3><div class="row"><select class="inp" id="lb-grp" style="flex:1;min-width:160px" aria-label="Groupe">${myGroups().map(g=>`<option value="${esc(g.id)}" ${g.id===(c.statut==='validation'?'designs':'prothese')?'selected':''}>${esc(g.nom)}</option>`).join('')}</select><button type="button" class="btn ghost" data-act="labShare" data-id="${esc(c.id)}">${ic('send')}Envoyer au groupe</button></div></section>
-  <section class="stack" style="gap:6px"><h3>Historique</h3><div class="list">${[...(c.historique||[])].reverse().map(h=>`<div class="li"><div class="grow"><div class="t small">${esc(sec.steps.find(x=>x[0]===h.s)?.[1]||h.s)}</div><div class="s">${esc(nameOf(h.by))}, ${new Date(h.ts).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})}</div></div></div>`).join('')||'<div class="small muted">Aucun changement enregistré.</div>'}</div></section>`:''}
+  <section class="stack" style="gap:8px"><h3>Partager</h3><div class="row"><select class="inp" id="lb-grp" style="flex:1;min-width:160px" aria-label="Groupe">${myGroups().map(g=>`<option value="${esc(g.id)}" ${g.id===(['validation','design'].includes(labSt(c))?'designs':'prothese')?'selected':''}>${esc(g.nom)}</option>`).join('')}</select><button type="button" class="btn ghost" data-act="labShare" data-id="${esc(c.id)}">${ic('send')}Envoyer au groupe</button></div></section>
+  <section class="stack" style="gap:6px"><h3>Historique</h3><div class="list">${[...(c.historique||[])].reverse().map(h=>`<div class="li"><div class="grow"><div class="t small">${esc(sec.steps.find(x=>x[0]===((LAB_ALIAS[tab]||{})[h.s]||h.s))?.[1]||h.s)}</div><div class="s">${esc(nameOf(h.by))}, ${new Date(h.ts).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})}</div></div></div>`).join('')||'<div class="small muted">Aucun changement enregistré.</div>'}</div></section>`:''}
   <datalist id="dl-trav">${sec.travaux.map(x=>`<option value="${esc(x)}">`).join('')}</datalist><datalist id="dl-mat">${sec.materiaux.map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
   <datalist id="dl-teinte">${TEINTES.map(x=>`<option value="${x}">`).join('')}</datalist><datalist id="dl-labs">${labs.map(x=>`<option value="${esc(x)}">`).join('')}</datalist><datalist id="dl-lprat">${praticiens.map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`,
  onOk:async f=>{if(!f.patient.trim()||!f.travail.trim()){toast('Indiquez le patient et le travail.','err');return false}if(tab==='externe'&&!f.laboExt.trim()){toast('Indiquez le laboratoire.','err');return false}
   const pick=S.patPick[f.patient];let patient=f.patient.trim(),patientId=c.patientId||null;if(pick){patient=pick.nom;patientId=pick.id}else if(patient!==(c.patient||''))patientId=null;
   const data={section:tab,patient,patientId,travail:f.travail.trim(),dents:f.dents.trim(),teinte:(f.teinte||'').trim(),nb:f.nb?Number(f.nb):null,materiau:f.materiau.trim(),laboExt:(f.laboExt||'').trim(),envoiLe:f.envoiLe||'',
-   praticien:f.praticien.trim(),echeance:f.echeance,statut:f.statut,notes:f.notes.trim(),maj:Date.now(),par:S.uid};
+   praticien:f.praticien.trim(),echeance:f.echeance,statut:f.statut||labSt(c),notes:f.notes.trim(),maj:Date.now(),par:S.uid};
   if(tab==='externe'&&'prix' in f)data.prix=f.prix===''?null:Number(f.prix);
   if(tab==='aligneurs'){data.alActuel=Math.max(0,Number(f.alActuel)||0);data.alIntervalle=Math.max(1,Number(f.alIntervalle)||14);data.alProchain=f.alProchain||''}
-  if(c.id){if(f.statut!==c.statut)data.historique=[...(c.historique||[]),{s:f.statut,ts:Date.now(),by:S.uid}].slice(-40);return W(()=>S.db.doc('labo/'+c.id).update(data),'Travail enregistré')}
-  return W(()=>S.db.collection('labo').add({...data,photos:[],historique:[{s:f.statut,ts:Date.now(),by:S.uid}],cree:Date.now(),creePar:S.uid}),'Travail ajouté')},
+  if(c.id){if(f.statut&&f.statut!==c.statut)data.historique=[...(c.historique||[]),{s:f.statut,ts:Date.now(),by:S.uid}].slice(-40);return W(()=>S.db.doc('labo/'+c.id).update(data),'Travail enregistré')}
+  return W(()=>S.db.collection('labo').add({...data,photos:[],historique:[{s:data.statut,ts:Date.now(),by:S.uid}],cree:Date.now(),creePar:S.uid}),'Travail ajouté — le prothésiste est prévenu')},
  onDel:async()=>{if(!await ask('Supprimer ce travail et ses photos ?','Supprimer'))return false;const ok=await W(()=>S.db.doc('labo/'+c.id).delete(),'Travail supprimé');
   if(ok&&S.assets)for(const a of c.photos||[]){try{await S.assets.delete(a)}catch(e){}}return ok}});
  const inp=$('#lb-pat',d);if(!ro&&perm('pat_voir'))patSuggest(inp)}
@@ -2221,6 +2228,22 @@ function rdvView(raw){const L=raw.map(r=>({...r}));const g={};L.forEach(r=>{cons
 function rdvFixStat(r,st){S._rdvFix=S._rdvFix||new Set();const k=r.id+st;if(S._rdvFix.has(k)||S.demo||!S.db||!(perm('rdv_gerer')||perm('rdv_jour')))return;S._rdvFix.add(k);
  [r.id,...(r._dup||[])].forEach(id=>S.db.doc('rdv/'+id).update({statut:st,maj:Date.now(),par:S.uid}).catch(()=>{}))}
 const rdvIds=r=>[r.id,...(r?._dup||[])];
+/* ---- Alerte sonore du prothésiste : nouveau cas ou étape à faire par le laboratoire ---- */
+let ALARM={ctx:null,t:null};
+document.addEventListener('pointerdown',()=>{try{if(!ALARM.ctx)ALARM.ctx=new (window.AudioContext||window.webkitAudioContext)();if(ALARM.ctx.state==='suspended')ALARM.ctx.resume()}catch(e){}},{passive:true});
+function alarmRing(){const c=ALARM.ctx;if(!c)return;const t0=c.currentTime;
+ for(let k=0;k<6;k++){const o=c.createOscillator(),g=c.createGain();o.type='square';o.frequency.value=k%2?660:880;g.gain.setValueAtTime(0.0001,t0+k*0.28);g.gain.exponentialRampToValueAtTime(0.6,t0+k*0.28+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t0+k*0.28+0.25);o.connect(g).connect(c.destination);o.start(t0+k*0.28);o.stop(t0+k*0.28+0.26)}
+ try{navigator.vibrate?.([600,200,600,200,600])}catch(e){}}
+function alarmStart(){if(ALARM.t)return;alarmRing();ALARM.t=setInterval(alarmRing,2500)}
+function alarmStop(){clearInterval(ALARM.t);ALARM.t=null}
+const labMyTurn=c=>{if(labDone(c)||c.section==='externe')return false;const nx=LAB[c.section]?.steps?.[labStepIdx(c)+1];return !!nx&&(!nx[2]||nx[2]==='lab')};
+function labAlarmCheck(){if(labSide()!=='lab'||S.demo)return;const L=(S.labo||[]).filter(labMyTurn);let seen=ls.get('ns_labseen',null);if(!Array.isArray(seen))seen=null;
+ const key=c=>c.id+':'+labSt(c);if(!seen){ls.set('ns_labseen',L.map(key));return}
+ const nouveaux=L.filter(c=>!seen.includes(key(c)));if(!nouveaux.length)return;alarmStart();
+ const d=$('#ask');if(d.open&&d.dataset.lab!=='1')return;d.dataset.lab='1';
+ d.innerHTML=`<div class="dlg-in"><header><h2>🔔 Laboratoire : ${nouveaux.length} travail${nouveaux.length>1?'x':''} à faire</h2></header><div class="dlg-b"><div class="list">${nouveaux.map(c=>{const nx=LAB[c.section].steps[labStepIdx(c)+1];return `<div class="li"><div class="grow"><div class="t">${esc(c.patient||'Patient')}</div><div class="s">${esc([LAB[c.section].nom,c.travail,c.dents?'dent '+c.dents:''].filter(Boolean).join(' · '))}</div><div class="s"><b>À faire : ${esc(nx?.[1]||'')}</b></div></div></div>`}).join('')}</div></div>
+ <footer><span class="sp"></span><button class="btn pri big" id="lab-ok">J'ai vu</button></footer></div>`;
+ $('#lab-ok',d).onclick=()=>{alarmStop();ls.set('ns_labseen',L.map(key));d.dataset.lab='';d.close();S.labTab=nouveaux[0].section;go('labo')};if(!d.open)d.showModal()}
 /* ================= Coffre de documents du cabinet ================= */
 const COF_CATS=['Contrat','Assurance (RC professionnelle, locaux…)','Autorisation / licence','Garantie d\'équipement','Diplôme / inscription à l\'Ordre','Administratif / fiscal','Bail','Autre'];
 const cofState=x=>{if(!x.expire)return 'ok';const t=today();return x.expire<t?'expire':x.expire<=addDays(t,Number(x.rappel)||30)?'bientot':'ok'};
@@ -2602,8 +2625,8 @@ const Acts={mfaOn,mfaOff,xp:a=>xp(a.dataset.k),theme:a=>{ls.set('ns_theme',a.dat
  verifyCheck:async()=>{const u=firebase.auth().currentUser;await u.reload();if(u.emailVerified){await u.getIdToken(true);location.reload()}else toast('E-mail pas encore confirmé.','err')},
  installApp:installApp,memDelete:a=>memDelete(a.dataset.u),memReset:a=>memReset(a.dataset.u),logout,
  alVoir:()=>{S.labTab='aligneurs';S.labFilter='remettre';go('labo')},labTab:a=>{S.labTab=a.dataset.t;S.labFilter='encours';S.stockFilter='tous';go('labo')},labFilter:a=>{S.labFilter=a.dataset.k;Views.labo.update()},
- labNew:()=>labModal(),labOpen:a=>labModal(S.labo.find(x=>x.id===a.dataset.id)),
- labNext:a=>{const c=S.labo.find(x=>x.id===a.dataset.id);if(!c)return;const nx=LAB[c.section].steps[labStepIdx(c)+1];if(nx)labSetStep(c,nx[0])},
+ labNew:()=>{if(labSide()==='lab'){toast('Les nouveaux cas sont créés par le cabinet.','err');return}labModal()},labOpen:a=>labModal(S.labo.find(x=>x.id===a.dataset.id)),
+ labNext:a=>{const c=S.labo.find(x=>x.id===a.dataset.id);if(!c)return;const nx=LAB[c.section].steps[labStepIdx(c)+1];if(nx&&labCanDo(nx))labSetStep(c,nx[0])},
  labAddPhoto:a=>{if(!S.assets){toast('L\'ajout de photos demande un accès Éditeur à la page.','err');return}S.labUpId=a.dataset.id;S.labCat=a.dataset.c||'travail';$('#labfile').click()},alRemis:a=>{if(a.closest('#dlg'))$('#dlg').close();alRemis(a.dataset.id)},
  labZoom:async a=>{const src=await blobReady(a.dataset.a);photoView(src,'Photo du travail')},
  labShare:a=>labShare(a.dataset.id),memRefuse:async a=>{const u=a.dataset.u;if(await ask('Refuser l\'accès de '+nameOf(u)+' ?','Refuser'))setMember(u,{statut:'refuse',le:Date.now()},'Demande refusée')},
@@ -2653,7 +2676,7 @@ function startData(){if(S.dataStarted||gated())return;S.dataStarted=true;const d
  if(perm('rdv_voir')||perm('rdv_jour')){addSub(db.collection('rdv').where('date','==',today()).onSnapshot(s=>{S.rdvToday=rdvView(s.docs.map(d=>({id:d.id,...d.data()})));refresh('accueil')},w));addSub(db.collection('rdv').where('date','==',addDays(today(),1)).onSnapshot(s=>{S.rdvTomorrow=s.docs.map(d=>({id:d.id,...d.data()}));refresh('accueil')},w));subRdvSel()}
  if(perm('mod_groupes')){const acc={};myGroups().forEach(g=>addSub(db.collection('messages').where('groupe','==',g.id).orderBy('ts','desc').limit(20).onSnapshot(s=>{acc[g.id]=s.docs.map(d=>({id:d.id,...d.data()}));S.latest=Object.values(acc).flat().sort((a,b)=>b.ts-a.ts);refresh('accueil','groupes')},w)))}
  if(perm('mod_stock')||perm('labo_voir'))addSub(db.collection('stock').onSnapshot(s=>{S.stock=s.docs.map(d=>({id:d.id,...d.data()}));refresh('stock','accueil','labo')},w));
- if(perm('labo_voir'))addSub(db.collection('labo').orderBy('maj','desc').limit(500).onSnapshot(s=>{S.labo=s.docs.map(d=>({id:d.id,...d.data()}));refresh('labo','accueil','patients');const P=$('#labPhotos');if(P){const c=S.labo.find(x=>x.id===P.dataset.id);if(c)P.innerHTML=labPhotosHTML(c)}},w));
+ if(perm('labo_voir'))addSub(db.collection('labo').orderBy('maj','desc').limit(500).onSnapshot(s=>{S.labo=s.docs.map(d=>({id:d.id,...d.data()}));refresh('labo','accueil','patients');labAlarmCheck();const P=$('#labPhotos');if(P){const c=S.labo.find(x=>x.id===P.dataset.id);if(c)P.innerHTML=labPhotosHTML(c)}},w));
  if(perm('compta_voir')||perm('mod_stock')||perm('labo_voir'))addSub(db.collection('fournisseurs').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]={id:d.id,...d.data()});S.four=o;refresh('compta','stock','labo')},w));
  if(perm('compta_voir')){addSub(db.collection('factures').orderBy('date','desc').limit(1500).onSnapshot(s=>{S.factures=s.docs.map(d=>({id:d.id,...d.data()}));refresh('compta')},w));addSub(db.collection('assurances').orderBy('date','desc').limit(3000).onSnapshot(s=>{S.assur=s.docs.map(d=>({id:d.id,...d.data()}));refresh('compta')},w))}
  if(perm('mod_maint'))addSub(db.collection('equipements').onSnapshot(s=>{S.equip=s.docs.map(d=>({id:d.id,...d.data()}));refresh('maintenance','accueil')},w));
