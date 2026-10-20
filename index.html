@@ -583,7 +583,7 @@ const groups=()=>(S.cfg.groupes?.liste?.length?S.cfg.groupes.liste:DEF_GROUPS);
 const templates=()=>(S.cfg.checklists?.liste?.length?S.cfg.checklists.liste:DEF_CL);
 const reglement=()=>(S.cfg.reglement?.articles?.length?S.cfg.reglement.articles:DEF_REGLEMENT);
 const MODULES=[['pat_liste','Liste des patients (noms et téléphones, sans dossier médical)'],['rdv_voir','Agenda complet'],['rdv_jour','Rendez-vous du jour uniquement (photos, radios, soins, notes)'],['pat_voir','Dossiers patients'],['labo_voir','Laboratoire'],['mod_groupes','Groupes de discussion'],['mod_checklists','Checklists'],['mod_stock','Stock du cabinet'],['caisse','Caisse (saisie des encaissements, sans voir les totaux)'],['compta_voir','Comptabilité : factures, assurances et fournisseurs (avec les montants)'],['devis','Plans de traitement et devis (avec les montants)'],['mod_pointage','Pointage'],['mod_taches','Mes tâches du jour'],['mod_maint','Maintenance des équipements'],['mod_steril','Traçabilité de la stérilisation'],['coffre','Documents du cabinet (contrats, assurances…)'],['mod_notes','Bloc-notes personnel'],['mod_reglement','Règlement intérieur']];
-const ACTIONS=[['rdv_gerer','Ajouter et modifier des rendez-vous'],['rdv_suppr','Supprimer des rendez-vous'],['pat_edit','Créer et modifier les fiches patients'],['pat_docs','Ajouter des radios et des photos'],['pat_suppr','Supprimer des patients et des fichiers'],['stock_edit','Modifier le stock du cabinet'],['labo_gerer','Créer et suivre les travaux du laboratoire, gérer son stock'],['caisse_edit','Corriger ses encaissements du jour (sans voir les totaux)'],['compta_edit','Comptabilité : ajouter et modifier factures, paiements, assurances et fournisseurs'],['ordonnances','Rédiger ordonnances et certificats']];
+const ACTIONS=[['rdv_gerer','Ajouter et modifier des rendez-vous'],['rdv_suppr','Supprimer des rendez-vous'],['pat_edit','Créer et modifier les fiches patients'],['pat_docs','Ajouter des radios et des photos'],['pat_suppr','Supprimer des patients et des fichiers'],['stock_edit','Modifier le stock du cabinet'],['labo_gerer','Créer et suivre les travaux du laboratoire, gérer son stock'],['caisse_edit','Corriger ses encaissements du jour (sans voir les totaux)'],['compta_edit','Comptabilité : ajouter et modifier factures, paiements, assurances et fournisseurs'],['ordonnances','Rédiger ordonnances et certificats'],['sans_gps','Sans vérification de position (ordinateur fixe du cabinet) — les horaires de travail restent appliqués']];
 const PERMS=[...MODULES,...ACTIONS];
 const DEF_ON=['mod_groupes','mod_checklists','mod_stock','mod_pointage','mod_reglement','mod_taches','mod_notes','mod_maint','mod_steril'];
 const PRESETS={dentiste:['ordonnances','devis','rdv_voir','rdv_gerer','rdv_suppr','pat_voir','pat_edit','pat_docs','stock_edit','labo_voir','labo_gerer'],assistante:['rdv_jour','stock_edit'],
@@ -594,7 +594,8 @@ const statutOf=u=>memberOf(u)?.statut||'attente';
 const rawPerm=p=>{if(S.isOwner)return true;const m=memberOf(meUid());if(!m||m.statut!=='actif')return false;const v=m.perms?.[p];return v===undefined?DEF_ON.includes(p):!!v};
 /* Hors du cabinet (GPS), seuls les groupes de discussion restent accessibles. Le compte du Docteur n'est jamais limité. */
 const inHours=()=>{const sl=slotsOf(today());if(!sl.length)return false;const n=minOf(Date.now());return n>=toMin(sl[0][0])-30&&n<=toMin(sl[sl.length-1][1])+30};
-const siteLock=()=>S.demo?S.demoSite==='out':(!S.isOwner&&((S.cfg?.cabinet?.lat!=null&&S.site!=='in')||!inHours()));
+const sansGps=()=>!S.isOwner&&!!memberOf(meUid())?.perms?.sans_gps;
+const siteLock=()=>S.demo?(S.demoSite==='out'&&!sansGps()):(!S.isOwner&&((S.cfg?.cabinet?.lat!=null&&S.site!=='in'&&!sansGps())||!inHours()));
 const perm=p=>rawPerm(p)&&(p==='mod_groupes'||!siteLock());
 const myGroups=()=>{if(S.isOwner)return groups();const g=memberOf(meUid())?.groupes;return Array.isArray(g)?groups().filter(x=>g.includes(x.id)):groups()};
 const roleOf=u=>(u===S.uid&&S.isOwner)?'dentiste':(memberOf(u)?.role||'');
@@ -738,7 +739,7 @@ const geoErr=e=>e?.code===1?'Localisation refusée. Autorisez la position pour c
 async function pointer(){
  if(!S.uid){toast('Votre identité n\'est pas disponible : ouvrez la page connecté à votre compte.','err');return}
  const cab=S.cfg.cabinet;let loc=null;
- if(cab?.lat!=null&&!S.isOwner){toast('Vérification de votre position…');let c;try{c=await getPos()}catch(e){toast(geoErr(e),'err');return}
+ if(cab?.lat!=null&&!S.isOwner&&!sansGps()){toast('Vérification de votre position…');let c;try{c=await getPos()}catch(e){toast(geoErr(e),'err');return}
   const d=Math.round(distM(cab,{lat:c.latitude,lng:c.longitude})),acc=Math.round(c.accuracy||0),R=Number(cab.rayon)||10;
   const v=siteVerdict(d,acc,R,S.site==='in');presLog(v===null?'imprecis':v?'in':'out',d,acc);
   if(v===null&&S.site!=='in'){toast('Position trop imprécise : activez le Wi-Fi et la « Position exacte », puis réessayez.','err');return}
@@ -850,7 +851,7 @@ function sitePos(p){const c=p.coords||p;const cab=S.cfg?.cabinet;if(!cab||cab.la
  if(wasIn){const now=Date.now();if(!S._outN||now-(S._outT||0)>600000){S._outN=1;S._outT=now;return}if(now-S._outT<45000)return;S._outN=0}
  setSite('out',{d,acc})}
 let siteWatch=null;
-function startSite(){if(S._owner||!S.cfg?.cabinet||S.cfg.cabinet.lat==null)return;
+function startSite(){if(S._owner||sansGps()||!S.cfg?.cabinet||S.cfg.cabinet.lat==null)return;
  if(!S.site){const last=Number(ls.get('ns_site_in',0));S.site=Date.now()-last<20*60000?'in':'checking'}
  if(!navigator.geolocation){setSite('nogps',{msg:'Cet appareil ne permet pas de vérifier votre position (pas de GPS).'});return}
  const err=e=>{if(S.site==='in'&&Date.now()-Number(ls.get('ns_site_in',0))<20*60000&&e?.code!==1)return;presLog('erreur'+(e?.code||''),0,0);setSite('nogps',{msg:geoErr(e)})};
@@ -1908,23 +1909,25 @@ function noteEdit(id){const n=(S.notes||[]).find(x=>x.id===id)||{titre:'',texte:
   onDel:async()=>{if(!await ask('Supprimer cette note ?','Supprimer'))return false;return W(()=>S.db.doc(`notes/${S.uid}/n/${n.id}`).delete(),'Note supprimée')}})}
 
 /* ---- Informations du cabinet (en-têtes, messages) ---- */
-const infos=()=>({nom:'Natural Smile Dental Office',docteur:'Dr. Saadeddine Hafdi Idrissi',specialite:'Chirurgien-dentiste',adresse:'',ville:'Fès',tel:'',email:'',inpe:'',...(S.cfg?.infos||{})});
+const infos=()=>({nom:'Natural Smile Dental Office',docteur:'Dr. Saadeddine Hafdi Idrissi',specialite:'Chirurgien-dentiste',adresse:'',ville:'Fès',tel:'',whatsapp:'',email:'',inpe:'',...(S.cfg?.infos||{})});
 const DEF_MSG={rappel:'Bonjour {patient}, nous vous rappelons votre rendez-vous {jour} à {heure} au cabinet {cabinet}. Merci de nous prévenir en cas d\'empêchement.\nمرحباً، نذكّركم بموعدكم {jour_ar} على الساعة {heure} بعيادة {cabinet}. المرجو إخبارنا في حالة التعذر.',
  recall:'Bonjour {patient}, votre dernière visite au cabinet {cabinet} date de {depuis}. Un contrôle régulier est recommandé : répondez à ce message pour fixer un rendez-vous.\nمرحباً، مرّ على آخر زيارة لكم لعيادة {cabinet} {depuis}. ننصح بفحص دوري، المرجو الرد على هذه الرسالة لتحديد موعد.',
  attente:'Bonjour {patient}, un créneau vient de se libérer au cabinet {cabinet} : {jour} à {heure}. Souhaitez-vous le prendre ?\nمرحباً، تحرّر موعد بعيادة {cabinet} {jour_ar} على الساعة {heure}. هل يناسبكم؟'};
 const msgTpl=k=>S.cfg?.messages?.[k]||DEF_MSG[k];
 const JOURS_AR=['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
 function fillMsg(t,o){const d=o.date?new Date(o.date+'T12:00:00'):null;const rel=o.date===addDays(today(),1)?['demain','غداً']:o.date===today()?['aujourd\'hui','اليوم']:d?['le '+fmtDate(o.date,{weekday:'long',day:'numeric',month:'long'}),'يوم '+JOURS_AR[d.getDay()]+' '+d.getDate()+'/'+(d.getMonth()+1)]:['',''];
- return t.replace(/\{patient\}/g,o.patient||'').replace(/\{heure\}/g,o.heure||'').replace(/\{jour\}/g,rel[0]).replace(/\{jour_ar\}/g,rel[1]).replace(/\{cabinet\}/g,infos().nom.replace(' Dental Office','')).replace(/\{depuis\}/g,o.depuis||'')}
+ return t.replace(/\{patient\}/g,o.patient||'').replace(/\{heure\}/g,o.heure||'').replace(/\{jour\}/g,rel[0]).replace(/\{jour_ar\}/g,rel[1]).replace(/\{cabinet\}/g,infos().nom.replace(' Dental Office','')).replace(/\{depuis\}/g,o.depuis||'').replace(/\{tel\}/g,infos().tel||'').replace(/\{whatsapp\}/g,infos().whatsapp||'')}
 function infosEdit(){if(!S.isOwner)return;const I=infos();const M={...DEF_MSG,...(S.cfg?.messages||{})};
  openModal({title:'Cabinet : informations et messages',body:`<div class="small muted">Utilisées dans les en-têtes des ordonnances, devis, certificats et dans les messages WhatsApp.</div>
   <div class="fgrid"><label class="f">Nom du cabinet<input class="inp" name="nom" value="${esc(I.nom)}"></label><label class="f">Praticien<input class="inp" name="docteur" value="${esc(I.docteur)}"></label></div>
   <div class="fgrid"><label class="f">Spécialité / titre<input class="inp" name="specialite" value="${esc(I.specialite)}"></label><label class="f">N° INPE<input class="inp" name="inpe" value="${esc(I.inpe)}"></label></div>
   <label class="f">Adresse<input class="inp" name="adresse" value="${esc(I.adresse)}"></label>
-  <div class="fgrid"><label class="f">Ville<input class="inp" name="ville" value="${esc(I.ville)}"></label><label class="f">Téléphone<input class="inp" name="tel" value="${esc(I.tel)}"></label><label class="f">E-mail<input class="inp" name="email" value="${esc(I.email)}"></label></div>
-  <h3>Messages WhatsApp</h3><div class="small muted">Variables : {patient}, {jour}, {jour_ar}, {heure}, {cabinet}, {depuis}</div>
+  <div class="fgrid"><label class="f">Ville<input class="inp" name="ville" value="${esc(I.ville)}"></label><label class="f">E-mail<input class="inp" name="email" value="${esc(I.email)}"></label></div>
+  <div class="fgrid"><label class="f">Téléphone fixe du cabinet<input class="inp" type="tel" name="tel" value="${esc(I.tel)}" placeholder="05 35 …"></label><label class="f">WhatsApp du cabinet<input class="inp" type="tel" name="whatsapp" value="${esc(I.whatsapp)}" placeholder="06 … ou 07 …"></label></div>
+  <div class="small muted">Les messages aux patients partent du WhatsApp ouvert sur l'appareil qui les envoie : utilisez le téléphone (ou l'ordinateur relié par WhatsApp Web) où le WhatsApp du cabinet est installé.${I.whatsapp?` <a href="${esc(waLink(I.whatsapp,'Test Natural Smile'))}" target="_blank" rel="noopener">Vérifier le numéro WhatsApp</a>`:''}</div>
+  <h3>Messages WhatsApp</h3><div class="small muted">Variables : {patient}, {jour}, {jour_ar}, {heure}, {cabinet}, {depuis}, {tel}, {whatsapp}</div>
   ${[['rappel','Rappel de rendez-vous'],['recall','Rappel de contrôle périodique'],['attente','Créneau libéré (liste d\'attente)']].map(([k,l])=>`<label class="f">${l}<textarea class="inp" name="m_${k}" rows="4">${esc(M[k])}</textarea></label>`).join('')}`,
-  onOk:async f=>{const inf={};['nom','docteur','specialite','inpe','adresse','ville','tel','email'].forEach(k=>inf[k]=String(f[k]||'').trim());
+  onOk:async f=>{const inf={};['nom','docteur','specialite','inpe','adresse','ville','tel','whatsapp','email'].forEach(k=>inf[k]=String(f[k]||'').trim());
    const msg={};Object.keys(DEF_MSG).forEach(k=>msg[k]=String(f['m_'+k]||'').trim()||DEF_MSG[k]);
    return await W(()=>S.db.doc('cfg/infos').set(inf))&&W(()=>S.db.doc('cfg/messages').set(msg),'Informations enregistrées')}})}
 
@@ -1933,7 +1936,7 @@ async function rappelsWA(date){date=date||addDays(today(),1);let L=[];
  try{const s=await S.db.collection('rdv').where('date','==',date).get();L=s.docs.map(d=>({id:d.id,...d.data()})).filter(r=>!['annule','absent'].includes(r.statut)).sort((a,b)=>(a.heure||'').localeCompare(b.heure||''))}catch(e){toast(errMsg(e),'err');return}
  const n=L.filter(r=>r.tel&&!r.rappel).length;
  const d=openModal({title:'Rappels WhatsApp',ok:null,cancel:'Fermer',body:`<div class="row" style="gap:8px;align-items:center"><label class="f" style="flex-direction:row;align-items:center;gap:8px">Jour<input class="inp" type="date" id="rw-d" value="${esc(date)}" style="width:auto"></label><span class="sp"></span><span class="small muted">${n} à envoyer</span></div>
-  <div class="small muted">Touchez « Envoyer » : WhatsApp s'ouvre avec le message prêt, il suffit d'appuyer sur la flèche d'envoi puis de revenir ici.</div>
+  <div class="small muted">Touchez « Envoyer » : WhatsApp s'ouvre avec le message prêt, il suffit d'appuyer sur la flèche d'envoi puis de revenir ici. Le message part du WhatsApp de cet appareil${infos().whatsapp?` : il doit s'agir du WhatsApp du cabinet (${esc(infos().whatsapp)})`:''}.</div>
   <div class="list" id="rw-l">${L.map(r=>`<div class="li"><span class="timechip">${esc(r.heure||'')}</span><div class="grow"><div class="t">${esc(r.patient||'Patient')}${soinTag(r)}</div><div class="s">${esc(r.tel||'Pas de téléphone')}${r.rappel?` · <span class="pill ok">envoyé ${hm(r.rappel)}</span>`:''}</div></div>${r.tel?`<a class="btn ${r.rappel?'ghost':'pri'}" href="${esc(waLink(r.tel,fillMsg(msgTpl('rappel'),r)))}" target="_blank" rel="noopener" data-rw="${esc(r.id)}">${ic('chat')}${r.rappel?'Renvoyer':'Envoyer'}</a>`:''}</div>`).join('')||'<div class="small muted">Aucun rendez-vous ce jour.</div>'}</div>`});
  $('#rw-d',d).onchange=e=>rappelsWA(e.target.value||date);
  $('#rw-l',d).addEventListener('click',e=>{const a=e.target.closest('[data-rw]');if(!a)return;const id=a.dataset.rw;S.db.doc('rdv/'+id).update({rappel:Date.now()}).catch(()=>{});a.classList.remove('pri');a.classList.add('ghost');a.innerHTML=ic('check')+'Envoyé'})}
@@ -1986,7 +1989,7 @@ function printHTML(title,inner,size){const I=infos();const css=`@page{size:${siz
  .sig{margin-top:28px;display:flex;justify-content:space-between;gap:20px;font-size:10.5pt}.sig img{max-width:220px;max-height:90px;display:block}.foot{margin-top:24px;font-size:9pt;color:#777;text-align:center;border-top:1px solid #ddd;padding-top:6px}
  .rx{white-space:pre-wrap;font-size:12.5pt;margin:6px 0 0}.rx li{margin-bottom:10px}.txt{white-space:pre-wrap;text-align:justify}`;
  const html=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>${css}</style></head><body>
- <div class="hd"><img src="${location.href.replace(/[#?].*$/,'').replace(/[^/]*$/,'')}logo-mark.png" alt=""><div><b>${esc(I.nom.toUpperCase())}</b><div class="s">${esc(I.docteur)}${I.specialite?' · '+esc(I.specialite):''}${I.inpe?' · INPE '+esc(I.inpe):''}</div><div class="s">${esc([I.adresse,I.ville].filter(Boolean).join(', '))}${I.tel?' · Tél. '+esc(I.tel):''}</div></div></div>
+ <div class="hd"><img src="${location.href.replace(/[#?].*$/,'').replace(/[^/]*$/,'')}logo-mark.png" alt=""><div><b>${esc(I.nom.toUpperCase())}</b><div class="s">${esc(I.docteur)}${I.specialite?' · '+esc(I.specialite):''}${I.inpe?' · INPE '+esc(I.inpe):''}</div><div class="s">${esc([I.adresse,I.ville].filter(Boolean).join(', '))}${I.tel?' · Tél. '+esc(I.tel):''}${I.whatsapp?' · WhatsApp '+esc(I.whatsapp):''}</div></div></div>
  ${inner}<div class="foot">${esc(I.nom)}${I.ville?' · '+esc(I.ville):''}${I.email?' · '+esc(I.email):''}</div></body></html>`;
  const fr=document.createElement('iframe');fr.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';document.body.appendChild(fr);
  const w=fr.contentWindow;w.document.open();w.document.write(html);w.document.close();
