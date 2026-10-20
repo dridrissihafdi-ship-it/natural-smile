@@ -801,7 +801,11 @@ Views.accueil={update(el){
    ${(()=>{const T=(S.rdvTomorrow||[]).filter(r=>r.statut!=='annule'&&rdvLong(r)).sort((a,b)=>(a.heure||'').localeCompare(b.heure||''));if(!T.length)return '';
     return `<section class="card" style="border-color:var(--warn,#c9a227)"><div class="card-h"><h3>Demain : séances à préparer</h3></div><div class="small muted" style="margin-bottom:6px">Séances de plus d'une heure ou chirurgicales.</div>
     <div class="list">${T.map(r=>`<div class="li"><span class="timechip">${esc(r.heure||'')}</span><div class="grow"><div class="t">${esc(r.patient||'Patient')}${soinTag(r)}</div><div class="s">${esc([r.acte,r.duree?r.duree+' min':'',r.praticien].filter(Boolean).join(' · '))}</div></div></div>`).join('')}</div></section>`})()}
-   ${perm('labo_voir')&&S.labo.some(alDueSoon)?(()=>{const L=S.labo.filter(alDueSoon).sort((a,b)=>a.alProchain<b.alProchain?-1:1);return `<section class="card">
+   ${(perm('rdv_gerer')||S.isOwner)&&perm('labo_voir')&&S.labo.some(alSansRdv)?(()=>{const L=S.labo.filter(alSansRdv);return `<section class="card" style="border:1.5px solid var(--bad)">
+    <div class="card-h"><h3>Aligneurs : rendez-vous à donner</h3><span class="sp"></span><span class="pill bad">${L.length}</span></div>
+    <div class="small muted" style="margin:-4px 0 6px">Ces patients ont un traitement par aligneurs en cours sans aucun rendez-vous programmé (rendez-vous annulé sans nouvelle date). Rappel envoyé tous les 3 jours.</div>
+    <div class="list">${L.map(c=>`<div class="li" style="cursor:pointer" data-act="labOpen" data-id="${esc(c.id)}"><div class="grow"><div class="t">${esc(c.patient||'Patient')}</div><div class="s">Porte l'aligneur ${esc(c.alActuel||0)} / ${esc(c.nb)}${c.alRemis?' depuis le '+esc(fmtDate(c.alRemis,{day:'numeric',month:'short'})):''} · prochain : n° ${(Number(c.alActuel)||0)+1}</div></div><span class="pill bad">Aucun RDV</span></div>`).join('')}</div></section>`})():''}
+   ${perm('labo_voir')&&S.labo.some(alDueSoon)?(()=>{const L=S.labo.filter(alDueSoon).sort((a,b)=>alNext(a).date<alNext(b).date?-1:1);return `<section class="card">
     <div class="card-h"><h3>Aligneurs à remettre</h3><span class="sp"></span><button class="btn ghost" data-act="alVoir">Voir</button></div>
     <div class="list">${L.slice(0,6).map(c=>`<div class="li" style="cursor:pointer" data-act="labOpen" data-id="${esc(c.id)}"><div class="grow"><div class="t">${esc(c.patient||'Patient')}</div><div class="s">Aligneur ${(Number(c.alActuel)||0)+1} sur ${esc(c.nb)}</div></div>${alPill(c).replace(/Aligneur \d+ : /,'')}</div>`).join('')}</div></section>`})():''}
    ${perm('mod_stock')?`<section class="card">
@@ -1571,12 +1575,23 @@ function labPhotosHTML(c){const can=perm('labo_gerer')&&S.assets;const P=c.photo
 /* Suivi des aligneurs chez le patient */
 const alTrack=c=>c.section==='aligneurs'&&Number(c.nb)>0;
 const alEnCours=c=>alTrack(c)&&(Number(c.alActuel)||0)<Number(c.nb);
-const alDueSoon=c=>alEnCours(c)&&c.alProchain&&c.alProchain<=addDays(today(),3);
-function alPill(c){if(!alEnCours(c)||!c.alProchain)return alTrack(c)&&!alEnCours(c)?'<span class="pill ok">Traitement terminé</span>':'';const d=c.alProchain,t=today();
+// Prochain aligneur : le prochain rendez-vous du patient dans l'agenda (logiciel du cabinet) ; à défaut, la date calculée
+S.alRdv=S.alRdv||{};
+const alNext=c=>{const r=c.patientId?S.alRdv[c.patientId]:undefined;if(r)return {date:r.date,heure:r.heure,src:'rdv'};if(r===null)return {none:true,date:c.alProchain||'',src:'calc'};return {date:c.alProchain||'',src:'calc'}};
+const alSansRdv=c=>alEnCours(c)&&!!c.patientId&&S.alRdv[c.patientId]===null;
+const alDueSoon=c=>{if(!alEnCours(c))return false;const n=alNext(c);return !!n.date&&n.date<=addDays(today(),3)};
+async function alLoadRdv(force){if(!S.db||!(perm('rdv_voir')||S.isOwner))return;if(!force&&Date.now()-(S._alT||0)<300000)return;S._alT=Date.now();
+ const ids=[...new Set((S.labo||[]).filter(c=>alEnCours(c)&&c.patientId).map(c=>c.patientId))];if(!ids.length)return;const out={};ids.forEach(i=>out[i]=null);
+ try{for(let i=0;i<ids.length;i+=10){const q=await S.db.collection('rdv').where('patientId','in',ids.slice(i,i+10)).get();
+   q.docs.map(d=>d.data()).filter(r=>r.date>=today()&&!['annule','absent'].includes(r.statut)).forEach(r=>{const o=out[r.patientId];if(!o||(r.date+(r.heure||''))<(o.date+(o.heure||'')))out[r.patientId]={date:r.date,heure:r.heure||''}})}
+  S.alRdv=out;refresh('labo','accueil')}catch(e){console.warn('alLoadRdv',e)}}
+function alPill(c){if(alSansRdv(c))return '<span class="pill bad">Aucun rendez-vous</span>';const N=alNext(c);if(!alEnCours(c)||!N.date)return alTrack(c)&&!alEnCours(c)?'<span class="pill ok">Traitement terminé</span>':'';const d=N.date,t=today();
  const lbl=d===t?'aujourd\'hui':d===addDays(t,1)?'demain':fmtDate(d,{weekday:'short',day:'numeric',month:'short'});
  return `<span class="pill ${d<t?'bad':d<=addDays(t,3)?'warn':''}">Aligneur ${(Number(c.alActuel)||0)+1} : ${d<t?'en retard, ':''}${esc(lbl)}</span>`}
-function alProgress(c){if(!alTrack(c))return '';const n=Number(c.nb),a=Math.min(n,Number(c.alActuel)||0);
- return `<div class="alprog"><div class="row small" style="gap:6px"><b>Aligneur ${a} / ${n}</b><span class="muted">${a>=n?'série terminée':`, reste ${n-a}`}</span><span class="sp"></span>${alPill(c)}</div><div class="bar"><i style="width:${Math.round(a/n*100)}%"></i></div></div>`}
+function alProgress(c){if(!alTrack(c))return '';const n=Number(c.nb),a=Math.min(n,Number(c.alActuel)||0);const N=alNext(c);const pose=c.alRemis||(c.alHist||[]).slice(-1)[0]?.d;
+ return `<div class="alprog"><div class="row small" style="gap:6px"><b>Aligneur ${a} / ${n}</b><span class="muted">${a>=n?'série terminée':`, reste ${n-a}`}</span><span class="sp"></span>${alPill(c)}</div><div class="bar"><i style="width:${Math.round(a/n*100)}%"></i></div>
+ ${a?`<div class="small">Porte l'aligneur n° ${a}${pose?` depuis le ${esc(fmtDate(pose,{weekday:'short',day:'numeric',month:'long'}))}`:''}</div>`:''}
+ ${alEnCours(c)?(alSansRdv(c)?`<div class="small" style="color:var(--bad);font-weight:600">Aligneur n° ${a+1} : aucun rendez-vous programmé dans l'agenda — à fixer.</div>`:N.date?`<div class="small">Aligneur n° ${a+1} : ${N.src==='rdv'?'rendez-vous':'prévu'} le ${esc(fmtDate(N.date,{weekday:'long',day:'numeric',month:'long'}))}${N.heure?' à '+esc(N.heure):''}${N.src==='rdv'?' (agenda)':''}</div>`:''):''}</div>`}
 async function alRemis(id){const c=S.labo.find(x=>x.id===id);if(!c)return;const a=(Number(c.alActuel)||0)+1,n=Number(c.nb),iv=Number(c.alIntervalle)||14;
  if(!await ask(`Confirmer la remise de l'aligneur n° ${a} sur ${n} à ${c.patient||'ce patient'} ?`,'Confirmer'))return;
  const h=[...(c.alHist||[]),{n:a,d:today(),by:S.uid}].slice(-80);
@@ -2690,7 +2705,7 @@ function startData(){if(S.dataStarted||gated())return;S.dataStarted=true;const d
  if(perm('rdv_voir')||perm('rdv_jour')){addSub(db.collection('rdv').where('date','==',today()).onSnapshot(s=>{S.rdvToday=rdvView(s.docs.map(d=>({id:d.id,...d.data()})));refresh('accueil')},w));addSub(db.collection('rdv').where('date','==',addDays(today(),1)).onSnapshot(s=>{S.rdvTomorrow=s.docs.map(d=>({id:d.id,...d.data()}));refresh('accueil')},w));subRdvSel()}
  if(perm('mod_groupes')){const acc={};myGroups().forEach(g=>addSub(db.collection('messages').where('groupe','==',g.id).orderBy('ts','desc').limit(20).onSnapshot(s=>{acc[g.id]=s.docs.map(d=>({id:d.id,...d.data()}));S.latest=Object.values(acc).flat().sort((a,b)=>b.ts-a.ts);refresh('accueil','groupes')},w)))}
  if(perm('mod_stock')||perm('labo_voir'))addSub(db.collection('stock').onSnapshot(s=>{S.stock=s.docs.map(d=>({id:d.id,...d.data()}));refresh('stock','accueil','labo')},w));
- if(perm('labo_voir'))addSub(db.collection('labo').orderBy('maj','desc').limit(500).onSnapshot(s=>{S.labo=s.docs.map(d=>({id:d.id,...d.data()}));refresh('labo','accueil','patients');labAlarmCheck();const P=$('#labPhotos');if(P){const c=S.labo.find(x=>x.id===P.dataset.id);if(c)P.innerHTML=labPhotosHTML(c)}},w));
+ if(perm('labo_voir'))addSub(db.collection('labo').orderBy('maj','desc').limit(500).onSnapshot(s=>{S.labo=s.docs.map(d=>({id:d.id,...d.data()}));refresh('labo','accueil','patients');labAlarmCheck();alLoadRdv();const P=$('#labPhotos');if(P){const c=S.labo.find(x=>x.id===P.dataset.id);if(c)P.innerHTML=labPhotosHTML(c)}},w));
  if(perm('compta_voir')||perm('mod_stock')||perm('labo_voir'))addSub(db.collection('fournisseurs').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]={id:d.id,...d.data()});S.four=o;refresh('compta','stock','labo')},w));
  if(perm('compta_voir')){addSub(db.collection('factures').orderBy('date','desc').limit(1500).onSnapshot(s=>{S.factures=s.docs.map(d=>({id:d.id,...d.data()}));refresh('compta')},w));addSub(db.collection('assurances').orderBy('date','desc').limit(3000).onSnapshot(s=>{S.assur=s.docs.map(d=>({id:d.id,...d.data()}));refresh('compta')},w))}
  if(perm('mod_maint'))addSub(db.collection('equipements').onSnapshot(s=>{S.equip=s.docs.map(d=>({id:d.id,...d.data()}));refresh('maintenance','accueil')},w));
